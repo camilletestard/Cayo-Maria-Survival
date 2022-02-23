@@ -1,0 +1,7 @@
+Interaction term ,Regression coefficient ,Hazard ratio (95%cl),Wald Z,P-value
+Maternal social integration X Maternal rank,-0.0043,"1.00 (0.98, 1.012)",-0.53,0.598
+Maternal social integration X Group size,0.00026,"1.00 (0.91, 1.095)",0.01,0.996
+Maternal social integration X Sex,-0.46,"0.63 (0.32, 1.24)",-1.35,0.179
+Group size X Maternal rank ,-0.0014,"1.00 (0.99, 1.004)",-0.48,0.632
+Group size X Sex,0.13,"0.88 (0.73, 1.051)",-1.42,0.155
+Maternal rank X Sex ,-0.0313,"0.97 (0.93, 1.007)",-1.6,0.11

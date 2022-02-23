@@ -1,0 +1,144 @@
+#Generate input data for survival models.
+#Feburary 2022, Camille Testard
+
+library(stringr)
+library(igraph)
+library(lubridate)
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(stringr)
+
+#Load scan data and population info
+setwd("~/Dropbox (Penn)/CayoBehavior/Data/Census")
+census = xlsx::read.xlsx("Cayo demographic file_03.2020.xlsx", 1)
+rm(list = setdiff(ls(), "census", "pedigree"))
+pedigree = read.csv("/PEDIGREE_2021.txt", sep = '\t')
+
+group = c("F","F","F","V","V","V","KK","KK")
+years = c(2015, 2016, 2017, 2015, 2016, 2017, 2015, 2017)
+groupyears = c("F2015", "F2016", "F2017", "V2015", "V2016", "V2017","KK2015", "KK2017")
+SocialCapital.ALL = data.frame()
+
+study.start.date = as.Date("2017-09-17")
+study.end.date = as.Date("2018-10-01") #as.Date("2020-02-01") #adjust when we have an updated demographic file
+study.end.date.KK = as.Date("2018-10-01") #Separate study end date for KK since they were culled in 2018
+study.perod.days = study.end.date - study.start.date
+study.perod.days.KK = study.end.date.KK - study.start.date
+
+#####################################################################
+# Compute Social Capital Metrics, per individual, per year
+#####################################################################
+
+gy=1
+for (gy in 1:length(groupyears)){
+
+  print(paste("%%%%%%%%%%%%%%%%%% ",groupyears[gy], "%%%%%%%%%%%%%%%%%%"))
+
+  #Load data
+  setwd("~/Dropbox (Penn)/CayoBehavior/Data/BehaviorAllGroups_2010-2019/BehaviouralData/")
+  groom_data = read.csv(paste("Group",groupyears[gy],"_GroomingEvents.txt", sep = ""))
+  meta_data = read.csv(paste("Group",groupyears[gy],"_GroupByYear.txt", sep = ""))
+  prox_data = read.csv(paste("Group",groupyears[gy],"_ProximityGroups.txt", sep = ""))
+
+  #Create Social Capital Data frame & add Sex, Age, Rank, Group and Year
+  SocialCapitalData= meta_data[meta_data$focalcutoff_met=="Y",c("id","sex","ordinal.rank","percofsex.dominanted","hrs.focalfollowed")]
+  names(SocialCapitalData)=c("id","sex","ordrank","percentrank","hrs.followed")
+  SocialCapitalData$group = group[gy]
+  SocialCapitalData$year.prehurr = years[gy]
+  if (group[gy] =="KK"){SocialCapitalData$study.end.date = study.end.date.KK}else{SocialCapitalData$study.end.date = study.end.date}
+  if (group[gy] =="KK"){study.perod = study.perod.days.KK}else{study.perod = study.perod.days}
+
+  #Get group size at study start
+  alive.idx = which((census$DOB < study.start.date &
+                       (census$DOD > study.start.date | census$DateTransfer > study.start.date))|
+                      census$Status == "IN CS")
+  monkeys_alive_studystart = census[alive.idx,]
+  SocialCapitalData$group.size = length(which(monkeys_alive_studystart$LastGroup==group[gy])) #Includes ALL individuals alive at study start date
+
+  ### Get demographic data ###
+  ID.idx = match(SocialCapitalData$id, census$AnimalID) #get the idx for the appropriate individuals
+
+  SocialCapitalData$Status = census$Status[ID.idx] #get status (dead, removed or alive)
+  SocialCapitalData$DOB = census$DOB[ID.idx] #get DOB
+  SocialCapitalData$DOD = census$DOD[ID.idx] #get DOD
+  SocialCapitalData$Age_entry.days = study.start.date - census$DOB[ID.idx] #age in days at the start of the study
+
+  #Get age in days at the end of the study (until event: death or end of study)
+  SocialCapitalData$Age_event.days = census$DOD[ID.idx]- census$DOB[ID.idx]
+  SocialCapitalData$Age_event.days[is.na(SocialCapitalData$Age_event.days)] = SocialCapitalData$Age_entry.days[is.na(SocialCapitalData$Age_event.days)] + study.perod
+      #SocialCapitalData$study.end.date[1] - census$DOB[ID.idx[is.na(SocialCapitalData$Age_event.days)]]
+
+  #If individual was removed or died after the study period, consider it alive
+  SocialCapitalData$Status[which(census$DateTransfer[ID.idx]>SocialCapitalData$study.end.date[1])] = "IN CS"
+  SocialCapitalData$Status[which(census$DOD[ID.idx]>SocialCapitalData$study.end.date[1])] = "IN CS"
+  #Also set event days to end of study rather than DOD.
+  SocialCapitalData$Age_event.days[which(census$DOD[ID.idx]>SocialCapitalData$study.end.date[1])] = SocialCapitalData$Age_entry.days[which(census$DOD[ID.idx]>SocialCapitalData$study.end.date[1])] + study.perod
+      #SocialCapitalData$study.end.date[1] - census$DOB[which(census$DOD[ID.idx]>SocialCapitalData$study.end.date[1])]
+
+  #Number of days in study. Total study period or until death
+  SocialCapitalData$days.in.study = SocialCapitalData$Age_event.days-SocialCapitalData$Age_entry.days
+
+  #Remove individuals that did not die "naturally" during the study period
+  SocialCapitalData = SocialCapitalData[SocialCapitalData$Status!="Remove",]
+
+  #Remove individuals who died before the start of the study
+  SocialCapitalData = SocialCapitalData[SocialCapitalData$days.in.study>0,]
+
+  #Create survival column which will be used in all models
+  SocialCapitalData$Survival = 0
+  SocialCapitalData$Survival[SocialCapitalData$Status=="Dead"] = 1
+
+
+  #####################################################################
+  ## Extract social integration measure from grooming data
+  #####################################################################
+
+  ## Format data
+  groom_data$conc = paste(groom_data$groom_giver,groom_data$groom_reciever,sep=".")
+  groom_data_compiled = aggregate(constrained_duration ~ conc, data=groom_data, FUN=sum)
+  groom_data_compiled$giver = substring(groom_data_compiled$conc,1,3)
+  groom_data_compiled$receiver = substring(groom_data_compiled$conc,5,8)
+  groom_data_compiled = select(groom_data_compiled, giver, receiver, conc, constrained_duration)
+  groom_data_compiled$giver.hrsfollowed = meta_data$hrs.focalfollowed[match(groom_data_compiled$giver, meta_data$id)]
+  groom_data_compiled$receiver.hrsfollowed = meta_data$hrs.focalfollowed[match(groom_data_compiled$receiver, meta_data$id)]
+
+  #Create grooming matrix
+  adjMat = dils::AdjacencyFromEdgelist(select(groom_data_compiled, giver, receiver, constrained_duration))
+  groomMat = adjMat[["adjacency"]]; rownames(groomMat) = adjMat[["nodelist"]]; colnames(groomMat) = adjMat[["nodelist"]]
+
+  #Find number of unique partners
+  unqIDs = as.character(SocialCapitalData$id)
+  id=1; social_integration= data.frame(); partner_strength=matrix(NA, nrow = length(unqIDs), ncol=20); partner_DSI=matrix(NA, nrow = length(unqIDs), ncol=20)
+  for (id in 1:length(unqIDs)){
+    social_integration[id,"id"] = unqIDs[id];
+    partners = unique(c(groom_data_compiled$receiver[groom_data_compiled$giver == unqIDs[id]],
+                        groom_data_compiled$giver[groom_data_compiled$receiver == unqIDs[id]]))
+    if (length(partners)!=0){
+      for (p in 1:length(partners)){
+        partner_strength[id,p]= groomMat[unqIDs[id], partners[p]] + groomMat[partners[p], unqIDs[id]]
+        partner_DSI[id, p]= partner_strength[id,p]/sum(meta_data$hrs.focalfollowed[match(unqIDs[id], meta_data$id)], meta_data$hrs.focalfollowed[match(partners[p], meta_data$id)], na.rm = T)
+      }
+    }else{
+      partner_DSI[id, 1]=0}
+    social_integration[id,"num.partners"] = length(partners)
+    social_integration[id,"top.partner"] = max(partner_DSI[id,], na.rm = T)
+  }
+  mean_groom_rate = mean(partner_DSI, na.rm = T)
+  social_integration$top.partner=social_integration$top.partner/mean_groom_rate
+  social_integration$std.num.partners = social_integration$num.partners/mean(social_integration$num.partners)
+
+  SocialCapitalData = merge(SocialCapitalData, social_integration, by="id")
+
+  ###################################################################
+  # Merge and save data
+  SocialCapital.ALL = rbind(SocialCapital.ALL, SocialCapitalData)
+  save(SocialCapital.ALL,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SocialCapital_Adults.RData")
+}
+
+setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data/')
+load('ChangeP.RData')
+names(dprob.ALL)[6] = "year.prehurr"
+full.data = merge(dprob.ALL, SocialCapital.ALL, by=c("id","year.prehurr","group"))
+save(full.data,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SocialCapital_changeP_adults.RData")
+

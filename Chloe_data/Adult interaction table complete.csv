@@ -1,0 +1,7 @@
+Interaction term,Regression coefficient ,Hazard ratio (95% cl),Wald Z,P-value
+Social integration x Rank,0.017,"1.02 (0.99, 1.04)",1.48,0.14
+Social integration x Group size,0.11,"1.12 (0.98, 1.28)",1.68,0.0922
+Social integration x Sex,0.56,"1.75 (0.77, 3.95)",1.33,0.182
+Group size x Rank,0.0028,"1.003 (1.00, 1.010)",0.75,0.454
+Group size x Sex,0.18,"1.20 (0.95, 1.50)",1.54,0.123
+Sex x Rank,-0.0063,"0.99 (0.95, 1.037)",-0.29,0.774
