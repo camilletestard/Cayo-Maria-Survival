@@ -1,22 +1,24 @@
 ##Adult interaction survival models##
-data<-read.csv(file.choose()) ##Adult data finished##
-library("survival")
-library(survminer)
-Scale=365.25
-Y=Surv(data$Age_entry.days./Scale,data$Age_event.days./Scale,data$Survival==2)
+setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data')
+load('SocialCapital_Adults.RData')
+data= SocialCapital.ALL[SocialCapital.ALL$group!="KK",]
+length(which(data$Survival==1))/nrow(data)
+Scale = 365.25
+
+Y=Surv(data$Age_entry.days/Scale, data$Age_event.days/Scale, data$Survival)
 
 #interactions
-Fit1<-coxph(Y~Social_integration+Rank+Social_integration*Rank,data=data)
+Fit1<-coxme(Y~std.num.partners+percentrank+std.num.partners*percentrank + (1|year.prehurr),data=data)
 summary(Fit1)
-Fit2<-coxph(Y~Group_size+Rank+Group_size*Rank, data=data)
+Fit2<-coxme(Y~group.size+percentrank+group.size*percentrank + (1|year.prehurr), data=data)
 summary(Fit2)
-Fit3<-coxph(Y~Sex+ Group_size+Sex*Group_size,data=data)
+Fit3<-coxme(Y~sex+ group.size+sex*group.size + (1|year.prehurr),data=data)
 summary(Fit3)
-Fit4<-coxph(Y~Social_integration+Group_size+Social_integration*Group_size,data=data)
+Fit4<-coxme(Y~std.num.partners+group.size+std.num.partners*group.size + (1|year.prehurr),data=data)
 summary(Fit4)
-Fit5<-coxph(Y~Social_integration+Sex+Social_integration*Sex,data=data)
+Fit5<-coxme(Y~std.num.partners+sex+std.num.partners*sex + (1|year.prehurr),data=data)
 summary(Fit5)
-Fit6<-coxph(Y~Sex+Rank+Sex*Rank,data=data)
+Fit6<-coxme(Y~sex+percentrank+sex*percentrank + (1|year.prehurr),data=data)
 summary(Fit6)
 
 interdata<-read.csv(file.choose()) ##Adult interaction table complete##

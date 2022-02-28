@@ -8,12 +8,13 @@ library(data.table)
 library(dplyr)
 library(tidyr)
 library(stringr)
+library(ggplot2)
 
 #Load scan data and population info
 setwd("~/Dropbox (Penn)/CayoBehavior/Data/Census")
-census = xlsx::read.xlsx("Cayo demographic file_03.2020.xlsx", 1)
-rm(list = setdiff(ls(), "census", "pedigree"))
-pedigree = read.csv("/PEDIGREE_2021.txt", sep = '\t')
+census = xlsx::read.xlsx("2021-12-16-CENSO-FINAL.xlsx", 1)
+#pedigree = read.csv("/PEDIGREE_2021.txt", sep = '\t')
+rm(list = setdiff(ls(), "census"))
 
 group = c("F","F","F","V","V","V","KK","KK")
 years = c(2015, 2016, 2017, 2015, 2016, 2017, 2015, 2017)
@@ -21,8 +22,8 @@ groupyears = c("F2015", "F2016", "F2017", "V2015", "V2016", "V2017","KK2015", "K
 SocialCapital.ALL = data.frame()
 
 study.start.date = as.Date("2017-09-17")
-study.end.date = as.Date("2018-10-01") #as.Date("2020-02-01") #adjust when we have an updated demographic file
-study.end.date.KK = as.Date("2018-10-01") #Separate study end date for KK since they were culled in 2018
+study.end.date = as.Date("2021-10-01") #as.Date("2020-03-01") #adjust when we have an updated demographic file
+study.end.date.KK = as.Date("2018-11-01") #Separate study end date for KK since they were culled in 2018
 study.perod.days = study.end.date - study.start.date
 study.perod.days.KK = study.end.date.KK - study.start.date
 
@@ -54,40 +55,41 @@ for (gy in 1:length(groupyears)){
                        (census$DOD > study.start.date | census$DateTransfer > study.start.date))|
                       census$Status == "IN CS")
   monkeys_alive_studystart = census[alive.idx,]
-  SocialCapitalData$group.size = length(which(monkeys_alive_studystart$LastGroup==group[gy])) #Includes ALL individuals alive at study start date
+  SocialCapitalData$group.size = length(which(monkeys_alive_studystart$Natal.Group==group[gy])) #Includes ALL individuals alive at study start date
 
   ### Get demographic data ###
   ID.idx = match(SocialCapitalData$id, census$AnimalID) #get the idx for the appropriate individuals
 
   SocialCapitalData$Status = census$Status[ID.idx] #get status (dead, removed or alive)
   SocialCapitalData$DOB = census$DOB[ID.idx] #get DOB
+  SocialCapitalData$age = as.numeric(study.start.date -SocialCapitalData$DOB)/365.25
   SocialCapitalData$DOD = census$DOD[ID.idx] #get DOD
+  SocialCapitalData$DOT = census$DateTransfer[ID.idx]#get DOT
   SocialCapitalData$Age_entry.days = study.start.date - census$DOB[ID.idx] #age in days at the start of the study
 
   #Get age in days at the end of the study (until event: death or end of study)
-  SocialCapitalData$Age_event.days = census$DOD[ID.idx]- census$DOB[ID.idx]
+  SocialCapitalData$Age_event.days = SocialCapitalData$DOD- SocialCapitalData$DOB
   SocialCapitalData$Age_event.days[is.na(SocialCapitalData$Age_event.days)] = SocialCapitalData$Age_entry.days[is.na(SocialCapitalData$Age_event.days)] + study.perod
-      #SocialCapitalData$study.end.date[1] - census$DOB[ID.idx[is.na(SocialCapitalData$Age_event.days)]]
 
   #If individual was removed or died after the study period, consider it alive
-  SocialCapitalData$Status[which(census$DateTransfer[ID.idx]>SocialCapitalData$study.end.date[1])] = "IN CS"
-  SocialCapitalData$Status[which(census$DOD[ID.idx]>SocialCapitalData$study.end.date[1])] = "IN CS"
+  SocialCapitalData$Status[which(SocialCapitalData$DOT>SocialCapitalData$study.end.date[1])] = "IN CS"
+  SocialCapitalData$Status[which(SocialCapitalData$DOD>SocialCapitalData$study.end.date[1])] = "IN CS"
   #Also set event days to end of study rather than DOD.
-  SocialCapitalData$Age_event.days[which(census$DOD[ID.idx]>SocialCapitalData$study.end.date[1])] = SocialCapitalData$Age_entry.days[which(census$DOD[ID.idx]>SocialCapitalData$study.end.date[1])] + study.perod
-      #SocialCapitalData$study.end.date[1] - census$DOB[which(census$DOD[ID.idx]>SocialCapitalData$study.end.date[1])]
+  SocialCapitalData$Age_event.days[which(SocialCapitalData$DOD>SocialCapitalData$study.end.date[1])] = SocialCapitalData$Age_entry.days[which(SocialCapitalData$DOD>SocialCapitalData$study.end.date[1])] + study.perod
+
+  #Censor individuals that did not die "naturally" during the study period
+  cull_censor = SocialCapitalData$Status=="REMOVE"
+  SocialCapitalData$Age_event.days[cull_censor] = SocialCapitalData$DOT[cull_censor]- SocialCapitalData$DOB[cull_censor]
 
   #Number of days in study. Total study period or until death
   SocialCapitalData$days.in.study = SocialCapitalData$Age_event.days-SocialCapitalData$Age_entry.days
 
-  #Remove individuals that did not die "naturally" during the study period
-  SocialCapitalData = SocialCapitalData[SocialCapitalData$Status!="Remove",]
-
-  #Remove individuals who died before the start of the study
+  #Discard individuals who died before the start of the study
   SocialCapitalData = SocialCapitalData[SocialCapitalData$days.in.study>0,]
 
   #Create survival column which will be used in all models
   SocialCapitalData$Survival = 0
-  SocialCapitalData$Survival[SocialCapitalData$Status=="Dead"] = 1
+  SocialCapitalData$Survival[SocialCapitalData$Status=="DEAD"] = 1
 
 
   #####################################################################
@@ -133,12 +135,24 @@ for (gy in 1:length(groupyears)){
   ###################################################################
   # Merge and save data
   SocialCapital.ALL = rbind(SocialCapital.ALL, SocialCapitalData)
-  save(SocialCapital.ALL,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SocialCapital_Adults.RData")
 }
+
+allids = unique(SocialCapital.ALL$id); table(SocialCapital.ALL$group[match(allids, SocialCapital.ALL$id)])
+length(which(SocialCapital.ALL$Survival[match(allids, SocialCapital.ALL$id)]==1)); length(SocialCapital.ALL$Survival[match(allids, SocialCapital.ALL$id)]==1)
+save(SocialCapital.ALL,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SocialCapital_Adults.RData")
 
 setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data/')
 load('ChangeP.RData')
 names(dprob.ALL)[6] = "year.prehurr"
 full.data = merge(dprob.ALL, SocialCapital.ALL, by=c("id","year.prehurr","group"))
+min_obs = 20
+full.data<- full.data[as.numeric(full.data$num_obs)>=min_obs,];
+
 save(full.data,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SocialCapital_changeP_adults.RData")
+
+example_data <- full.data[full.data$iter ==1,]
+allids_prepost = unique(example_data$id); table(example_data$group[match(allids, example_data$id)])
+length(which(example_data$Survival[match(allids_prepost, example_data$id)]==1)); length(example_data$Survival[match(allids_prepost, example_data$id)]==1)
+setwd('~/Documents/GitHub/Cayo-Maria-Survival/'); write.csv(example_data, "example_Datasheet_survivalAnalysis.csv", row.names = F)
+
 

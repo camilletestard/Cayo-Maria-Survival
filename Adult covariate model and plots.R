@@ -1,15 +1,16 @@
-setwd('~/Documents/GitHub/Cayo-Maria-Survival/')
-data.chloe<-read.csv(file.choose()) ##Adult data finished##
-
-load(file.choose())
-data= SocialCapital.ALL[SocialCapital.ALL$year.prehurr==2017,]
-#SocialCapital.ALL[SocialCapital.ALL$year.prehurr==2017 & SocialCapital.ALL$group!="KK",]
+setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data')
+#data.chloe<-read.csv(file.choose()) ##Adult data finished##
+load('SocialCapital_Adults.RData')
+data= SocialCapital.ALL[SocialCapital.ALL$group!="KK",]
+length(which(data$Survival==1))/nrow(data)
 Scale = 365.25
 
 library(survival)
 library(survminer)
+library(coxme)
 
 ###Cox PH model with the covariates group size, sex, and rank###
+#Format data
 data<-within(data,{
   sex<-factor(sex,labels=c("M","F"))
   ordrank<-factor(ordrank, labels=c("L","M","H"))
@@ -18,9 +19,20 @@ data<-within(data,{
   Age_event.days<-as.numeric(Age_event.days)
 })  ###data is adult data finished###
 
-model<-coxph( Surv(Age_entry.days/Scale, Age_event.days/Scale, Survival) ~ sex + ordrank + group.size, data=data)
+model<-coxph(Surv(Age_entry.days/Scale, Age_event.days/Scale, Survival) ~ sex + ordrank + group.size, data=data)
 summary (model) ##Results from the Cox PH model
 ggforest(model,data=data)
+
+model2<-coxme(Surv(Age_entry.days/Scale, Age_event.days/Scale, Survival) ~ sex + ordrank + group.size + (1|year.prehurr), data=data)
+summary (model2)
+ggforest(model,data=data)
+
+#Check assumptions
+cz <- cox.zph(model2)
+print(cz)
+ggcoxzph(cz)
+ggcoxdiagnostics(model2, type = "deviance",
+                 linear.predictions = FALSE, ggtheme = theme_bw())
 
 ###Survival curves for additional covariate model###
 ##Survival curve for model with the three covariates combined##
@@ -44,12 +56,12 @@ ggsurvplot(fitsex, data = data, xlim=c(2500,8000), xlab="Age in days", conf.int 
 ###Group model###
 Group_df<-with(data,
                data.frame (group.size= unique(data$group.size), #identifies levels within group size
-                           sex= c("F","F","F"), #Holds the effect of sex constant across groups
-                           ordrank= c("L","L","L") #Holds the effects of rank constant aross groups
+                           sex= c("F","F"), #Holds the effect of sex constant across groups
+                           ordrank= c("L","L") #Holds the effects of rank constant aross groups
                )
 )
 fitG<-survfit(res.coxr,newdata = Group_df)
-ggsurvplot(fitG, data = data, xlim=c(2500,8000), xlab="Age in days", conf.int = TRUE, legend="bottom", legend.labs=c("Group KK", " Group V","Group F"), ggtheme = theme_minimal())
+ggsurvplot(fitG, data = data, xlim=c(2500,8000), xlab="Age in days", conf.int = TRUE, legend="bottom", legend.labs=c("Group V","Group F"), ggtheme = theme_minimal())
 
 ###Rank model###
 Rank_df<-with(data,
@@ -59,7 +71,7 @@ Rank_df<-with(data,
               )
 )
 fitR<-survfit(res.coxr,newdata = Rank_df)
-ggsurvplot(fitR, data = data, xlim=c(2500,8000), xlab="Age in days", conf.int = TRUE, legend = "bottom", legend.labs=c("High rank", "Median rank","Low rank"), ggtheme = theme_minimal())
+ggsurvplot(fitR, data = data, xlim=c(2500,8000), xlab="Age in days", conf.int = TRUE, legend = "bottom", legend.labs=c("Low rank", "Middle rank","High rank"), ggtheme = theme_minimal())
 
 ##Plotting curves together##
 splots<-list()
