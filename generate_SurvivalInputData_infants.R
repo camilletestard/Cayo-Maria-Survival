@@ -20,11 +20,11 @@ groupyears = c("F2015", "F2016", "F2017", "V2015", "V2016", "V2017","KK2015", "K
 SocialCapital.ALL = data.frame()
 
 study.start.date = as.Date("2017-09-17")
-study.end.date = as.Date("2020-03-01") #as.Date("2020-03-01") #adjust when we have an updated demographic file
+study.end.date = as.Date("2021-11-01") 
 study.end.date.KK = as.Date("2018-11-01") #Separate study end date for KK since they were culled in 2018
 study.perod.days = study.end.date - study.start.date
 study.perod.days.KK = study.end.date.KK - study.start.date
-birth.date = as.Date("2016-10-01") #Include infants born after that age
+birth.date = as.Date("2016-10-01") #Only include infants born after that age
 
 gy=1
 for (gy in 1:length(groupyears)){
@@ -91,7 +91,7 @@ for (gy in 1:length(groupyears)){
                        (census$DOD > study.start.date | census$DateTransfer > study.start.date))|
                       census$Status == "IN CS")
   monkeys_alive_studystart = census[alive.idx,]
-  adult_data$group.size = length(which(monkeys_alive_studystart$LastGroup==group[gy])) #Includes ALL individuals alive at study start date
+  adult_data$group.size = length(which(monkeys_alive_studystart$Natal.Group==group[gy])) #Includes ALL individuals alive at study start date
 
   #####################################################################
   ## Extract social integration measure from grooming data
@@ -159,7 +159,7 @@ save(SocialCapital.ALL,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/Soci
 
 setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data/')
 load('ChangeP.RData')
-names(dprob.ALL)[6] = "year.prehurr"; names(dprob.ALL)[1] = "mom.id"
+names(dprob.ALL)[6] = "year.prehurr"; names(dprob.ALL)[1] = "mom.id"; names(dprob.ALL)[2]="mom.dpAcc"; names(dprob.ALL)[3]="mom.dpSocial"
 full.data = merge(dprob.ALL, SocialCapital.ALL, by=c("mom.id","year.prehurr","group"))
 min_obs = 20
 full.data<- full.data[as.numeric(full.data$num_obs)>=min_obs,];

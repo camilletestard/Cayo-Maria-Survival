@@ -1,7 +1,8 @@
+#Adult covariate model 
+
+#Load data
 setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data')
-#data.chloe<-read.csv(file.choose()) ##Adult data finished##
 load('SocialCapital_Adults.RData')
-data= SocialCapital.ALL[SocialCapital.ALL$group!="KK",]
 length(which(data$Survival==1))/nrow(data)
 Scale = 365.25
 

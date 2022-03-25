@@ -20,11 +20,11 @@ data<-within(data,{
 })
 
 #Run model
-fitsocial<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~mom.std.num.partners+ sex +(1|year.prehurr),data=data) #Runs a cox PH model with age as the time scale.
+fitsocial<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~mom.std.num.partners+ mom.percentrank+sex +(1|year.prehurr),data=data) #Runs a cox PH model with age as the time scale.
 cz <- cox.zph(fitsocial)
 print(cz)
 ggcoxzph(cz)
 summary(fitsocial)
 
-fitsocial2<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~mom.top.partner +sex +(1|year.prehurr),data=data) #Runs a cox PH model with age as the time scale.
+fitsocial2<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~mom.top.partner+ mom.percentrank +sex +(1|year.prehurr),data=data) #Runs a cox PH model with age as the time scale.
 summary(fitsocial2)

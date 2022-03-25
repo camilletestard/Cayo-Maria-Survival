@@ -22,7 +22,7 @@ groupyears = c("F2015", "F2016", "F2017", "V2015", "V2016", "V2017","KK2015", "K
 SocialCapital.ALL = data.frame()
 
 study.start.date = as.Date("2017-09-17")
-study.end.date = as.Date("2021-10-01") #as.Date("2020-03-01") #adjust when we have an updated demographic file
+study.end.date = as.Date("2021-11-01")
 study.end.date.KK = as.Date("2018-11-01") #Separate study end date for KK since they were culled in 2018
 study.perod.days = study.end.date - study.start.date
 study.perod.days.KK = study.end.date.KK - study.start.date
@@ -81,7 +81,7 @@ for (gy in 1:length(groupyears)){
   cull_censor = SocialCapitalData$Status=="REMOVE"
   SocialCapitalData$Age_event.days[cull_censor] = SocialCapitalData$DOT[cull_censor]- SocialCapitalData$DOB[cull_censor]
 
-  #Number of days in study. Total study period or until death
+  #Number of days in study. Total study period or until death/cull
   SocialCapitalData$days.in.study = SocialCapitalData$Age_event.days-SocialCapitalData$Age_entry.days
 
   #Discard individuals who died before the start of the study
@@ -94,6 +94,8 @@ for (gy in 1:length(groupyears)){
 
   #####################################################################
   ## Extract social integration measure from grooming data
+  #Number of grooming partners
+  #Strength of bond to top partner
   #####################################################################
 
   ## Format data
@@ -132,6 +134,12 @@ for (gy in 1:length(groupyears)){
 
   SocialCapitalData = merge(SocialCapitalData, social_integration, by="id")
 
+  #####################################################################
+  ## Extract social integration measure from proximity data
+  #Number of proximity partners
+  #Probability of proximity? Proximity rate?
+  #####################################################################
+  
   ###################################################################
   # Merge and save data
   SocialCapital.ALL = rbind(SocialCapital.ALL, SocialCapitalData)
@@ -148,7 +156,7 @@ full.data = merge(dprob.ALL, SocialCapital.ALL, by=c("id","year.prehurr","group"
 min_obs = 20
 full.data<- full.data[as.numeric(full.data$num_obs)>=min_obs,];
 
-save(full.data,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SocialCapital_changeP_adults.RData")
+save(full.data,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SocialCapital_changeP_Adults.RData")
 
 example_data <- full.data[full.data$iter ==1,]
 allids_prepost = unique(example_data$id); table(example_data$group[match(allids, example_data$id)])
