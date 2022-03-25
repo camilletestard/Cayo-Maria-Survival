@@ -85,7 +85,7 @@ dev.off()
 #            palette =
 #              c("#E7B800", "#2E9FDF"),# custom color palettes
 #            conf.int = TRUE,          # Add confidence interval
-#            pval = FALSE,              # Add p-value
+#            pval = TRUE,              # Add p-value
 #            risk.table = FALSE,        # Add risk table
 #            risk.table.col = "strata",# Risk table color by groups
 #            legend.labs =
