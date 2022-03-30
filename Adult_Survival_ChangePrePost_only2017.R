@@ -52,17 +52,16 @@ for (i in 1:max(full.data$iter)){
     Age_event.days<-as.numeric(Age_event.days)
     days.in.study<-as.numeric(days.in.study)
     num_obs<-scale(as.numeric(num_obs))
-    #year.prehurr<-as.factor(year.prehurr)
   })
   length(which(data2$Survival==1))/nrow(data2)
   
   #Fit the survival models
-  fitsocial.groom<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~dpSocial*sex +num_obs,data=data2) #Runs a cox PH model with age as the time scale.
+  fitsocial.groom<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~dpSocial*sex+percentrank +num_obs,data=data2) #Runs a cox PH model with age as the time scale.
   summary(fitsocial.groom)
   cz <- cox.zph(fitsocial.groom)
   #print(cz)
   
-  fitsocial.prox<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~dpAcc*sex +num_obs,data=data2) #Runs a cox PH model with age as the time scale.
+  fitsocial.prox<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~dpAcc+sex+ordrank +num_obs,data=data2) #Runs a cox PH model with age as the time scale.
   summary(fitsocial.prox)
   cz <- cox.zph(fitsocial.prox)
   #print(cz)

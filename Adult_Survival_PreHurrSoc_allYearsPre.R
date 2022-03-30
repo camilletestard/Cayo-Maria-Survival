@@ -35,7 +35,8 @@ data<-within(data,{
   Age_entry.days<-as.numeric(Age_entry.days)
   Age_event.days<-as.numeric(Age_event.days)
   days.in.study<-as.numeric(days.in.study)
-  #year.prehurr<-as.factor(year.prehurr)
+  year.prehurr<-as.factor(year.prehurr)
+  id<-as.factor(id)
 })
 #Create interaction terms (important for later plotting using ggforest)
 data$sexF.numpartner <- as.numeric(data$sex) * data$num.partners
@@ -46,12 +47,12 @@ data$sexF.toppartner <- as.numeric(data$sex) * data$top.partner
 
 
 ### Run models ###
-fitsocial.numpartner<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~num.partners*sex+ percentrank+ group.size+year.prehurr,data=data) #Runs a cox PH model with age as the time scale.
+fitsocial.numpartner<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~num.partners*sex+ percentrank+ group.size+(1|year.prehurr/id),data=data) #Runs a cox PH model with age as the time scale.
 cz <- cox.zph(fitsocial.numpartner) #Check model assumptions
 print(cz) ; #ggcoxzph(cz)
 summary(fitsocial.numpartner)
 
-fitsocial.toppartner<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~top.partner*sex+ percentrank+ year.prehurr,data=data) #Runs a cox PH model with age as the time scale.
+fitsocial.toppartner<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~top.partner*sex+ percentrank+ (1|year.prehurr/id),data=data) #Runs a cox PH model with age as the time scale.
 summary(fitsocial.toppartner)
 cz <- cox.zph(fitsocial.toppartner)
 print(cz)

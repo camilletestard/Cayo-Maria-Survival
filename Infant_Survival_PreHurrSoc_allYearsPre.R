@@ -25,17 +25,20 @@ data<-within(data,{
   Age_entry.days<-as.numeric(Age_entry.days)
   Age_event.days<-as.numeric(Age_event.days)
   days.in.study<-as.numeric(days.in.study)
+  year.prehurr<-as.factor(year.prehurr)
+  id<-as.factor(id)
 })
+table(data$id, data$year.prehurr)
 
 #### Run model #### 
-fitsocial.numpartner<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~mom.num.partners+ mom.ordrank +strata(sex) +strata(group.size) +year.prehurr,data=data) #Runs a cox PH model with age as the time scale.
+fitsocial.numpartner<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~mom.num.partners+ mom.percentrank +sex +group.size +(1|year.prehurr)+(1|id),data=data) #Runs a cox PH model with age as the time scale.
 #Note: group size should be stratified and rank should be ordinal to avoid breaking proportional hazard assumption
 cz <- cox.zph(fitsocial.numpartner)
 print(cz)
 #Note: mother rank does not follow proportionality assumption!
 summary(fitsocial.numpartner)
 
-fitsocial.toppartner<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~mom.top.partner+ mom.ordrank+ sex +year.prehurr,data=data) #Runs a cox PH model with age as the time scale.
+fitsocial.toppartner<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~mom.top.partner+ mom.percentrank +sex +group.size +(1|year.prehurr/id),data=data) #Runs a cox PH model with age as the time scale.
 cz <- cox.zph(fitsocial.toppartner)
 print(cz)
 summary(fitsocial.toppartner)

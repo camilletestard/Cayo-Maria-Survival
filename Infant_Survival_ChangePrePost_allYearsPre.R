@@ -14,7 +14,7 @@ library(coxme)
 #############################################
 setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data')
 load('SocialCapital_changeP_infants.RData') #input dataframe generated previously.
-#data2=full.data
+#data=full.data
 
 #Initialize variables
 fit.groom.hr=data.frame(matrix(ncol=5)); names(fit.groom.hr)=c("coef","exp(coef)","se(coef)","z","Pr(>|z|)")
@@ -22,26 +22,28 @@ fit.prox.hr=data.frame(matrix(ncol=5)); names(fit.prox.hr)=c("coef","exp(coef)",
 
 i=1
 for (i in 1:max(full.data$iter)){
-  data2= full.data[full.data$iter==i,];
+  data= full.data[full.data$iter==i,];
   
-  data2<-within(data2,{
+  data<-within(data,{
     sex<-factor(sex,labels=c("MALE","FEMALE"))
     group<-factor(group,labels=c("V","KK"))  ##Informs the model of the levels within the catagorical covariates (helps identify where the differences are)
     Age_entry.days<-as.numeric(Age_entry.days)
     Age_event.days<-as.numeric(Age_event.days)
     days.in.study<-as.numeric(days.in.study)
     num_obs<-scale(as.numeric(num_obs))
+    mom.dpAcc<- 100*mom.dpAcc
+    mom.dpSocial<- 100*mom.dpSocial
   })
-  length(which(data2$Survival==1))/nrow(data2)
+  length(which(data$Survival==1))/nrow(data)
   
-  fitsocial.groom<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~mom.dpSocial+ strata(sex) +mom.percentrank +year.prehurr+num_obs,data=data2) #Runs a cox PH model with age as the time scale.
+  fitsocial.groom<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~mom.dpSocial+ strata(sex) +mom.percentrank +year.prehurr+num_obs,data=data) #Runs a cox PH model with age as the time scale.
   summary(fitsocial.groom)
   cz <- cox.zph(fitsocial.groom) #Check model assumptions
   #print(cz)
   # Important note: sex does not follow the proportionality assumption. We therefore
   # fit a proportional hazard model with sex stratified (strata(sex))
   
-  fitsocial.prox<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~mom.dpAcc+ strata(sex) +mom.percentrank+ num_obs + year.prehurr,data=data2) #Runs a cox PH model with age as the time scale.
+  fitsocial.prox<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~mom.dpAcc+ strata(sex) +mom.percentrank+ num_obs + year.prehurr,data=data) #Runs a cox PH model with age as the time scale.
   summary(fitsocial.prox)
   cz <- cox.zph(fitsocial.prox)
   #print(cz)
@@ -51,11 +53,11 @@ for (i in 1:max(full.data$iter)){
   ### Hazard ratio plots ###
   # setwd('~/Documents/GitHub/Cayo-Maria-Survival/Results')
   # png("HazardRatio_dprox_infant.png", width=5.25,height=7.25,units="in",res=1200)
-  # ggforest(fitsocial.prox, data = data2)
+  # ggforest(fitsocial.prox, data = data)
   # dev.off()
   # 
   # png("HazardRatio_dgroom_infant.png", width=5.25,height=7.25,units="in",res=1200)
-  # ggforest(fitsocial.groom, data = data2)
+  # ggforest(fitsocial.groom, data = data)
   # dev.off()
   
   fit.groom.hr = rbind(fit.groom.hr, summary(fitsocial.groom)$coefficients[1,])

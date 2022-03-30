@@ -12,14 +12,20 @@ library(stringr)
 library(schoolmath)
 
 ######################################################
-#PRE-HURRICANE data
+#Data from separate files
 ######################################################
 
 #Load proximity scans from groups and years of interest in the focal format: 
-setwd("~/Documents/GitHub/Cayo-Maria/Data All Cleaned") 
-group = c("V", "V", "V", "V", "KK", "KK")
-years = c(2015, 2016, 2017, 2019, 2015, 2017)
-groupyears = c("V2015", "V2016", "V2017","KK2015", "KK2017")
+setwd("~/Documents/GitHub/Cayo-Maria-Survival/Data All Cleaned/BehavioralDataFiles") 
+# group = c("V", "V", "V", "V", "KK", "KK")
+# years = c(2015, 2016, 2017, 2019, 2015, 2017)
+# groupyears = c("V2015", "V2016", "V2017","KK2015", "KK2017")
+group = c("F","KK","F","HH","F","V","R","KK","R","V","F","HH","F","KK")
+years = c(2013, 2013,2014,2014,2015,2015,2015,2015,
+          2016,2016,2016,2016,2017,2017)
+groupyears = c("F2013","KK2013","F2014","HH2014","F2015","V2015","R2015","KK2015",
+               "R2016","V2016","F2016","HH2016","F2017","KK2017") #groupyears = c("HH2016","KK2017","S2019")
+
 
 allScans2 = data.frame(); count = 0; total_count=0; gy =7
 for (gy in 1:length(groupyears)){ #for all group & years
@@ -122,8 +128,9 @@ for (gy in 1:length(groupyears)){ #for all group & years
 }
 percentNoPartnerID = length(which(is.na(allScans2$partner.ID)))/length(which(allScans2$isSocial ==1))
 numUncertainCases = count/total_count
+
 ######################################################
-#Post-HURRICANE data
+#Data structured differently (2018, 2020)
 ######################################################
 
 #Load scans from 2018 (weird format, only scans)
