@@ -8,6 +8,8 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 library(ggplot2)
+library(lmerTest)
+library(lme4)
 
 group = c("F","KK","F","HH","F","V","R","KK","R","V","F","HH","F","KK","V","S","V","F","V")
 years = c(2013, 2013,2014,2014,2015,2015,2015,2015,
@@ -31,11 +33,9 @@ for (gy in 1:length(groupyears)){ #for all group & years
   prox_data = read.csv(paste("Group",groupyears[gy],"_ProximityGroups.txt", sep = ""))
   meta_data = read.csv(paste("Group",groupyears[gy],"_GroupByYear.txt", sep = "")) #load meta data
 
-  SocialCapitalData= meta_data[meta_data$focalcutoff_met=="Y",c("id","sex","ordinal.rank","percofsex.dominanted","hrs.focalfollowed")]
+  SocialCapitalData= meta_data[meta_data$focalcutoff_met=="Y",c("id","sex","age","ordinal.rank","percofsex.dominanted","hrs.focalfollowed")]
   SocialCapitalData$group = group[gy]
-  SocialCapitalData$year.prehurr = years[gy]
-  
-  if(years[gy]<2018){SocialCapitalData$isPost =0}else{SocialCapitalData$isPost = 1}
+  SocialCapitalData$year = years[gy]
   
   #####################################################################
   ## Extract social integration measure from grooming data
@@ -129,31 +129,47 @@ for (gy in 1:length(groupyears)){ #for all group & years
   # Merge and save data
   SocialCapital.ALL = rbind(SocialCapital.ALL, SocialCapitalData)
 }
-
+SocialCapital.ALL$isPost =0; SocialCapital.ALL$isPost[SocialCapital.ALL$year>2017]=1; 
+SocialCapital.ALL$isPost.year =0; SocialCapital.ALL$isPost[SocialCapital.ALL$years==2019]=1; SocialCapital.ALL$isPost[SocialCapital.ALL$years==2021]=2;
 SocialCapital.ALL$isPost=as.factor(SocialCapital.ALL$isPost)
 
+#Test change in aggression rates
 ggplot(SocialCapital.ALL, aes(x=isPost, y=agg.rate, fill=isPost))+
   geom_violin()+ theme_classic(base_size=15)+
   ylab('Aggression rate')+ xlab('')
 mean(SocialCapital.ALL$agg.rate[SocialCapital.ALL$isPost==0]); mean(SocialCapital.ALL$agg.rate[SocialCapital.ALL$isPost==1])
+agg.model<-glmer(agg.rate~ isPost + sex + ordinal.rank + (1|id), data = SocialCapital.ALL, family = poisson(link = "log"))
+summary(agg.model)
+car::Anova(agg.model)
 
+#Test change in probability(proximity)
 ggplot(SocialCapital.ALL, aes(x=isPost, y=prob.prox, fill=isPost))+
   geom_violin()+ theme_classic(base_size=15)+
   ylab('p(proximity)')+ xlab('')
 mean(SocialCapital.ALL$prob.prox[SocialCapital.ALL$isPost==0]); mean(SocialCapital.ALL$prob.prox[SocialCapital.ALL$isPost==1])
+prox.model<-lme4::lmer(prob.prox~ isPost + sex + (1|id), data = SocialCapital.ALL)
+summary(prox.model)
+car::Anova(agg.model)
 
 ggplot(SocialCapital.ALL, aes(x=isPost, y=CSIprox, fill=isPost))+
   geom_violin()+ theme_classic(base_size=15)+
   ylab('Average #monkeys in proximity')+ xlab('')
 mean(SocialCapital.ALL$CSIprox[SocialCapital.ALL$isPost==0]); mean(SocialCapital.ALL$CSIprox[SocialCapital.ALL$isPost==1])
 
+#Test change in groom rate
 ggplot(SocialCapital.ALL, aes(x=isPost, y=groom.rate, fill=isPost))+
   geom_violin()+ theme_classic(base_size=15)+
   ylab('Grooming rate')+ xlab('')
 mean(SocialCapital.ALL$groom.rate[SocialCapital.ALL$isPost==0]); mean(SocialCapital.ALL$groom.rate[SocialCapital.ALL$isPost==1])
+groom.model<-lme4::lmer(groom.rate~ isPost + sex + (1|id), data = SocialCapital.ALL)
+summary(groom.model)
+car::Anova(groom.model)
 
+#Test change in number of grooming partners
 ggplot(SocialCapital.ALL, aes(x=isPost, y=num.partners, fill=isPost))+
   geom_violin()+ theme_classic(base_size=15)+
   ylab('Number grooming partners')+ xlab('')
 mean(SocialCapital.ALL$num.partners[SocialCapital.ALL$isPost==0]); mean(SocialCapital.ALL$num.partners[SocialCapital.ALL$isPost==1])
-
+nump.model<-lmer(num.partners~ isPost + sex + (1|id), data = SocialCapital.ALL)
+summary(nump.model)
+car::Anova(nump.model)

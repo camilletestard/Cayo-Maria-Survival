@@ -28,6 +28,7 @@ for (gy in 1:length(groupyears)){ #for all group & years
 }
 
 id.isPost = table(all_MetaData$id, all_MetaData$isPost)
+id_pre = row.names(as.data.frame(which(id.isPost[,1]>0))); id_post = row.names(as.data.frame(which(id.isPost[,2]>0)))
 id.PreAndPost = as.data.frame(row.names(as.data.frame(which(id.isPost[,1]>0 & id.isPost[,2]>0)))); names(id.PreAndPost)="id"
 id.PreAndPost$group = all_MetaData$group[match(id.PreAndPost$id, all_MetaData$id)]
 table(id.PreAndPost$group)
