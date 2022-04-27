@@ -145,10 +145,23 @@ for (gy in 1:length(groupyears)){
   SocialCapital.ALL = rbind(SocialCapital.ALL, SocialCapitalData)
 }
 
+#Get year of event (or end of study)
+SocialCapital.ALL$YearOfEvent = NA
+SocialCapital.ALL$YearOfEvent[!is.na(SocialCapital.ALL$DOD)] = as.numeric(format(as.Date(SocialCapital.ALL$DOD[!is.na(SocialCapital.ALL$DOD)], format="%d/%m/%Y"),"%Y"))
+SocialCapital.ALL$YearOfEvent[!is.na(SocialCapital.ALL$DOT)] = as.numeric(format(as.Date(SocialCapital.ALL$DOT[!is.na(SocialCapital.ALL$DOT)], format="%d/%m/%Y"),"%Y"))
+SocialCapital.ALL$YearOfEvent[is.na(SocialCapital.ALL$YearOfEvent)] = 2021
+
+#PLACE HOLDER TO GET RANK AT TIME OF EVENT.
+
+#Get number of unique IDs included
 allids = unique(SocialCapital.ALL$id); table(SocialCapital.ALL$group[match(allids, SocialCapital.ALL$id)])
 length(which(SocialCapital.ALL$Survival[match(allids, SocialCapital.ALL$id)]==1)); length(SocialCapital.ALL$Survival[match(allids, SocialCapital.ALL$id)]==1)
+
+#Save file for pre-hurricane sociality
 save(SocialCapital.ALL,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SocialCapital_Adults.RData")
 
+#Add change in p(grooming) and p(proximity) to the dataframe
+#Because this only includes a subset of the individuals, save it in a separate file
 setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data/')
 load('ChangeP.RData')
 names(dprob.ALL)[6] = "year.prehurr"
@@ -158,6 +171,7 @@ full.data<- full.data[as.numeric(full.data$num_obs)>=min_obs,];
 
 save(full.data,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SocialCapital_changeP_Adults.RData")
 
+#Get the numebr of unique IDs for change in pre vs. post hurricane sociality
 example_data <- full.data[full.data$iter ==1,]
 allids_prepost = unique(example_data$id); table(example_data$group[match(allids, example_data$id)])
 length(which(example_data$Survival[match(allids_prepost, example_data$id)]==1)); length(example_data$Survival[match(allids_prepost, example_data$id)]==1)

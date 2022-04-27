@@ -11,9 +11,9 @@ length(which(data$Survival==1))/nrow(data)
 
 #Format data
 data<-within(data,{
-  sex<-factor(sex,labels=c("M","F"))
-  ordrank<-factor(mom.ordrank, labels=c("L","M","H"))
-  group<-factor(group,labels=c("F","V","KK"))  ##Informs the model of the levels within the catagorical covariates (helps identify where the differences are)
+  sex<-factor(sex,levels=c("M","F"))
+  ordrank<-factor(mom.ordrank, levels=c("L","M","H"))
+  group<-factor(group,levels=c("F","V","KK"))  ##Informs the model of the levels within the catagorical covariates (helps identify where the differences are)
   Age_entry.days<-as.numeric(Age_entry.days)
   Age_event.days<-as.numeric(Age_event.days)
   days.in.study<-as.numeric(days.in.study)

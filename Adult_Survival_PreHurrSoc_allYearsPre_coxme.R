@@ -45,7 +45,6 @@ data$sexF.partners.factor[data$sex.num.partners<1] = "L"
 data$sexF.partners.factor[data$sex.num.partners>1] = "H"
 data$sexF.toppartner <- as.numeric(data$sex) * data$top.partner
 
-
 ### Run models ###
 fitsocial.numpartner<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~num.partners*sex+ percentrank+ group.size+(1|year.prehurr)+(1|id),data=data) #Runs a cox PH model with age as the time scale.
 cz <- cox.zph(fitsocial.numpartner) #Check model assumptions

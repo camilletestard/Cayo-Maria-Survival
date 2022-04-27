@@ -22,47 +22,21 @@ setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data')
 load('SocialCapital_changeP_Adults.RData') #input dataframe generated previously.
 
 #Initialize variables
-fit.groom.hr=data.frame(matrix(ncol=6)); names(fit.groom.hr)=c("dpSocial","sexF","ordrankM","ordrankH","num_obs","dpSocial:sexF")
-fit.prox.hr=data.frame(matrix(ncol=6)); names(fit.prox.hr)=c("dpAcc","sexF","ordrankM","ordrankH","num_obs","dpAcc:sexF")
+fit.groom.hr=data.frame(matrix(ncol=6)); names(fit.groom.hr)=c("dpSocial","sexF","ordrankM","ordrankH", "num_obs")
+fit.prox.hr=data.frame(matrix(ncol=6)); names(fit.prox.hr)=c("dpAcc","sexF","ordrankM","ordrankH", "num_obs")
 
 
 i=1; max_iter = max(full.data$iter)
 for (i in 1:max_iter){
   data= full.data[full.data$iter==i,];
+  #data= full.data[full.data$iter<51,];
   
-  # #Plot the raw data
-  # setwd('~/Documents/GitHub/Cayo-Maria-Survival/Results')
-  # dpAcc.hist<-ggplot(data,aes(x=dpAcc))+
-  #   geom_histogram()+ theme_classic(base_size = 15)+
-  #   geom_vline(xintercept = 0, linetype="dashed", color = "red",size=2)+
-  #   xlab('Change in p(proximity) pre-to-post hurricane')
-  # ggsave("dpAcc.hist.png")
-  
-  # dpSocial.hist<-ggplot(data,aes(x=dpSocial))+
-  #   geom_histogram()+ theme_classic(base_size = 15)+
-  #   geom_vline(xintercept = 0, linetype="dashed", color = "red",size=2 )+
-  #   xlab('Change in p(grooming) pre-to-post hurricane')
-  # ggsave("dpSocial.hist.png")
-  # mean(data$dpSocial)
-  # 
-  # ggplot(data,aes(x=dpAcc, y=dpSocial))+
-  #   geom_point()+ xlab('Change in p(proximity)')+ ylab('Change in p(grooming)')+
-  #   geom_smooth(method='lm',formula= y~x)+ theme_classic(base_size = 15)
-  
-  # Plot 
-  ggplot(data, aes(x=as.factor(Survival), y=dpAcc))+
-    geom_violin()+ xlab('Death Status')+ylab('Change in p(proximity)')+
-    geom_boxplot(width=0.25)+ theme_classic(base_size = 15)
-  # ggplot(data, aes(x=as.factor(Survival), y=dpSocial)+
-  #   geom_violin()+xlab('Death Status')+ylab('Change in p(grooming)')+
-  #   geom_boxplot(width=0.25)+ theme_classic(base_size = 15)
-  # 
-  
+    
   #Format the data
   data<-within(data,{
-    sex<-factor(sex,labels=c("M","F"))
-    ordrank<-factor(ordrank, labels=c("L","M","H"))
-    group<-factor(group,labels=c("V","KK"))  ##Informs the model of the levels within the catagorical covariates (helps identify where the differences are)
+    sex<-factor(sex, levels = c("M", "F"))
+    ordrank<-factor(ordrank, levels = c("L", "M", "H"))
+    group<-as.factor(group)  ##Informs the model of the levels within the catagorical covariates (helps identify where the differences are)
     Age_entry.days<-as.numeric(Age_entry.days)
     Age_event.days<-as.numeric(Age_event.days)
     days.in.study<-as.numeric(days.in.study)
@@ -71,51 +45,58 @@ for (i in 1:max_iter){
     dpSocial<- 100*dpSocial
     year.prehurr<-as.factor(year.prehurr)
     id<-as.factor(id)
-    #Survival<-as.factor(Survival)
+    iter<-as.factor(iter)
   })
-  length(which(data$Survival==1))/nrow(data)
-  table(data$id, data$year.prehurr)
-  
+
   #Fit the survival models
-  try(fitsocial.groom<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~dpSocial*sex+ ordrank+ num_obs+ (1|year.prehurr)+(1|id) ,data=data)) #Runs a cox PH model with age as the time scale.
+  try(fitsocial.groom<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~dpSocial + sex+ ordrank +num_obs+ (1|year.prehurr)+(1|id) ,data=data)) #Runs a cox PH model with age as the time scale.
   summary(fitsocial.groom)
   #cz <- cox.zph(fitsocial.groom)
   #print(cz)
   
-  try(fitsocial.prox<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~dpAcc*sex+ ordrank + num_obs +(1|year.prehurr)+(1|id),data=data)) #Runs a cox PH model with age as the time scale.
+  try(fitsocial.prox<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~dpAcc + sex+ ordrank +num_obs+ (1|year.prehurr)+ (1|id),data=data)) #Runs a cox PH model with age as the time scale.
   summary(fitsocial.prox)
   #cz <- cox.zph(fitsocial.prox)
   #print(cz)
   
-  #plot difference in p(proximity) when alive vs. dead
-  # data$death.status="Alive"; data$death.status[data$Survival==1]="Dead"
-  # ggplot(data, aes(x=death.status, y=dpAcc))+
-  #   geom_violin()+
-  #   geom_boxplot(width=0.5)+ theme_classic(base_size = 16)+
-  #   ylab('Change in proximity pre-to-post hurricane')+ xlab('')
-  # mean(data$dpAcc[data$Survival==0]); mean(data$dpAcc[data$Survival==1])
-  # sum(data$Survival[data$sex=='F']);sum(data$Survival[data$sex=='M'])
   
   #Combine data from all iterations
+  if (all(fixef(fitsocial.groom))<4){
   fit.groom.hr = rbind(fit.groom.hr, fixef(fitsocial.groom))
-  fit.prox.hr = rbind(fit.prox.hr, fixef(fitsocial.prox))
+  fit.prox.hr = rbind(fit.prox.hr, fixef(fitsocial.prox))}
   #confint(fitsocial.prox); confint(fitsocial.groom)
   print(i)
   
 }
-# fit.groom.hr[which(fit.groom.hr>2 | fit.groom.hr<(-2),arr.ind=T)]=NA
-# fit.groom.hr$sexF[exp(fit.groom.hr$sexF)>1]=NA
-# fit.groom.hr$ordrankH[exp(fit.groom.hr$ordrankH)>1]=NA
-idx.groom = which(is.na(fit.groom.hr),arr.ind=T)
-fit.groom.hr.plot = melt(exp(fit.groom.hr[unique(-idx.groom[,1]),]))
 
-idx.prox = which(is.na(fit.prox.hr),arr.ind=T)
-fit.prox.hr.plot =  melt(exp(fit.prox.hr[unique(-idx.prox[,1]),]))
+save(fit.groom.hr, fit.prox.hr,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SurvivalAdults_PrePost.RData")
+load("~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SurvivalAdults_PrePost.RData")
 
-hist(exp(fit.prox.hr$dpAcc), 50, xlab = "Hazard ratio for change in proximity", main = "Histogram of Hazard Ratios for change in proximity")
-hist(exp(fit.groom.hr$dpSocial), 50, xlab = "Hazard ratio for change in grooming", main = "Histogram of Hazard Ratios for change in proximity")
-mean(exp(fit.prox.hr$dpAcc), na.rm=T); quantile(exp(fit.prox.hr$dpAcc),probs = c(0.025, 0.975), na.rm = T)
-mean(exp(fit.groom.hr$dpSocial), na.rm=T); quantile(exp(fit.groom.hr$dpSocial),probs = c(0.025, 0.975), na.rm = T)
+### PLOT SURVIVAL ###
+
+#Remove NAs
+idx.na.groom = which(is.na(fit.groom.hr),arr.ind=T)
+fit.groom.hr = fit.groom.hr[unique(-idx.na.groom),]
+
+idx.na.prox = which(is.na(fit.prox.hr),arr.ind=T)
+fit.prox.hr = fit.prox.hr[unique(-idx.na.prox),]
+
+#Remove extreme outliers due to model misfit
+outlier_thresh = 3 #more than 3 sd away from mean
+ZscoreGroom <- apply(fit.groom.hr, 2, function(x) (x - mean(x)) / sd(x))
+idx.outlier.groom = which(abs(ZscoreGroom) > 3, arr.ind = T)
+fit.groom.hr.exp=exp(fit.groom.hr[unique(-idx.outlier.groom[,1]),])
+fit.groom.hr.plot = melt(fit.groom.hr.exp)
+
+ZscoreProx <- apply(fit.prox.hr, 2, function(x) (x - mean(x)) / sd(x))
+idx.outlier.prox = which(abs(ZscoreProx) > 3, arr.ind = T)
+fit.prox.hr.exp = exp(fit.prox.hr[unique(-idx.outlier.prox[,1]),])
+fit.prox.hr.plot =  melt(fit.prox.hr.exp)
+
+hist(fit.prox.hr.exp$dpAcc, 50, xlab = "Hazard ratio for change in proximity", main = "Histogram of Hazard Ratios for change in proximity")
+hist(fit.groom.hr.exp$dpSocial, 65, xlab = "Hazard ratio for change in grooming", main = "Histogram of Hazard Ratios for change in grooming")
+mean(fit.prox.hr.exp$dpAcc, na.rm=T); quantile(exp(fit.prox.hr$dpAcc),probs = c(0.025, 0.975), na.rm = T)
+mean(fit.groom.hr.exp$dpSocial, na.rm=T); quantile(exp(fit.groom.hr$dpSocial),probs = c(0.025, 0.975), na.rm = T)
 
 prox.plot<-ggplot(fit.prox.hr.plot, aes(x=variable, y=value, color=variable))+
   geom_violin()+
@@ -126,6 +107,13 @@ prox.plot<-ggplot(fit.prox.hr.plot, aes(x=variable, y=value, color=variable))+
   title(main="Hazard ratios for change in p(proximity) models")+
   theme(axis.text.y = element_text(angle = 30))+
   coord_flip()
+Means = colMeans2(as.matrix(exp(fit.prox.hr))); Means = round(Means,3)
+CI = colQuantiles(as.matrix(exp(fit.prox.hr)), probs = c(0.025, 0.975), na.rm = TRUE); CI = round(CI,3)
+Estimates = cbind(Means,CI); Estimates = as.data.frame(Estimates); names(Estimates) = c("Estimate","2.5%","97.5%")
+t.Acc<-tableGrob(Estimates);t.Acc<-grid.arrange(t.Acc, top="p(Prox) Model (Group KK)");
+#write.csv(Estimates,"pprox.KK.csv")
+
+
   
 # vioplot(exp(fit.prox.hr.plot$dpAcc),exp(fit.prox.hr.plot$sexF),exp(fit.prox.hr.plot$`dpAcc:sexF`),
 #         exp(fit.prox.hr.plot$ordrankM),exp(fit.prox.hr.plot$ordrankH),exp(fit.prox.hr.plot$num_obs),

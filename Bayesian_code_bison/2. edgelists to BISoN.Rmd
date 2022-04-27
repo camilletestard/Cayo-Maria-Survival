@@ -1,0 +1,227 @@
+---
+title: "making MacaqueNet edgelists into BISoN networks & calculating network metrics"
+author: "Delphine De Moor"
+date: "11/04/2021"
+output: html_document
+---
+
+
+# to check with Jordan:
+
+- why is Assamensis so much less dense? obs h are correct
+- how to best automate for running on all datasets but reporting errors
+
+```{r setup, include=FALSE}
+# empty global environment 
+rm(list=ls())
+
+# load packages
+library(rstan)
+library(INLA)
+library(tidyverse)
+library(dplyr)
+library(magrittr)
+library(igraph)
+```
+
+# read in edgelist
+
+```{r, message=FALSE}
+setwd('')
+edgelist <- read_tsv("~/Documents/Github/Cayo-Maria-Survival/Bayesian_code_bison/mulatta_brent_F_2012_affi_groom_NA_frequency_edgelist.txt")
+
+edgelist$dyad <- factor(edgelist$dyad, levels=edgelist$dyad) # set dyad to factor (easier for modeling)
+
+unique_names <- unique(c(edgelist$ID1, edgelist$ID2))
+nr_ind <- length(unique_names)
+nr_dyads <- nr_ind*(nr_ind-1)/2 # -1 to remove self-interactions e.g. AA & /2 because undirected so AB = BA
+
+edgelist$ID1_id <- sapply(edgelist$ID1, function(x) which(unique_names == x)) # give numbered ID to each ID1
+edgelist$ID2_id <- sapply(edgelist$ID2, function(x) which(unique_names == x)) # give numbered ID to each ID2
+
+name_dataset <- "mulatta_brent_F_2012_affi_groom_NA_"
+# name_dataset <- "assamensis_schuelkeostner_mot_2017_affi_groom_NA_"
+# name_dataset <- "arctoides_delao_Mexico_2004_affi_groom_NA"
+# name_dataset <- "fascicularis_marty_hulk_2016_affi_groom_NA_"
+# name_dataset <- "maura_amici_sulawesi_2018_affi_groom_NA_"
+```
+
+# set priors
+set weakly informative (almost flat) prior that assumes rates can up to very high rates/hour (a true flat prior would go up to infinity), with only slightly higher probability of 0
+more informative priors influence too much when data is rather sparce
+priors are set in log space, so that rates can only be positive
+
+```{r}
+log_rate_mu <- 0
+log_rate_sigma <- 2
+log_rates <- rnorm(1e5, log_rate_mu, log_rate_sigma) # sampling from the priors for visualisation
+plot(density(exp(log_rates))) # the peak at 0 is misleading, note the very small densities: it's only a tiny peak actually
+```
+# fit the edge weight model
+
+```{r}
+prior.fixed <- list(mean=log_rate_mu, prec=1/log_rate_sigma) # specify the priors 
+# note that in INLA it uses precision instead of SD (which is 1/SD)
+
+fit_inla <- inla(
+  weight ~ 0 + dyad + offset(log(dyad_obs_h)), # model edge weights with offset term for observation effort
+  family="poisson", # poisson for frequency/count data
+  data=edgelist,
+  control.fixed=prior.fixed,
+  control.compute=list(config = TRUE)
+)
+
+#Look into a zero-inflation poisson model in INLA!
+```
+
+# get INLA model output in matrix form 
+with 1 column per dyad & then 10000 samples of the edge weights
+
+```{r}
+nr_samples <- 10000 #get samples from posterior distribution 
+log_rate_samples <- matrix(0, nr_samples, nr_dyads) # create empty matrix
+
+inla_samples <- inla.posterior.sample(nr_samples, fit_inla)
+
+for (i in 1:num_samples) { # fill in matrix
+  log_rate_samples[i, ] <- tail(inla_samples[[i]]$latent, nr_dyads)
+   # sampling happens across all dyads simultaneously (which is important if dyads are non-independent, e.g. with group scans)
+}
+```
+
+# run posterior predictive check 1
+plot predicted event counts against observed event counts
+
+```{r}
+rates_bison <- exp(summary(fit_inla)$fixed[1:nr_dyads, 1]) 
+
+jitter_sd <- 0.5 # set jitter lower to see real values (but then more overlap)
+
+plot(
+  edgelist$weight + rnorm(nr_dyads, sd=jitter_sd), 
+  rpois(nr_dyads, rates_bison * edgelist$dyad_obs_h) + rnorm(nr_dyads, sd=jitter_sd), 
+  col=rgb(0, 0, 1, jitter_sd),
+  xlab="Observed event counts",
+  ylab="Predicted event counts"
+)
+
+for (i in 1:20) { 
+  points(edgelist$weight + rnorm(nr_dyads, sd=jitter_sd), rpois(nr_dyads, rates_bison * edgelist$dyad_obs_h) + 
+           rnorm(nr_dyads, sd=jitter_sd), col=rgb(0, 0, 1, 0.25))
+}
+abline(a=0, b=1)
+
+# the model never will model true zero's because it can never be certain a dyad never interacts (absence of evidence)
+# if there are (many) true zero's expected in the data, it might be good to add a zero-inflated part that can model true zero's as edges
+# this will depend on the behaviour observed (e.g. more 0's in grooming than proximity) & other factors (e.g. more 0's in male interactions)
+```
+# run posterior predictive check 2
+plot BISoN edge weight estimates against point edge weight estimates (counts/observation time)
+
+```{r}
+rates_bison_lower <- exp(summary(fit_inla)$fixed[1:nr_dyads, 3])
+rates_bison_upper <- exp(summary(fit_inla)$fixed[1:nr_dyads, 5])
+rates_point_est <- edgelist$weight/edgelist$dyad_obs_h
+
+y_min <- min(rates_bison_lower)
+y_max <- max(rates_bison_upper)
+
+plot(rates_point_est, rates_bison, col="#387780", ylim=c(y_min, y_max), xlab="Point estimates of edge weights", ylab="BISoN estimates of edge weights")
+arrows(rates_point_est, rates_bison_lower, rates_point_est, rates_bison_upper, length=0)
+abline(a=0, b=1)
+
+# BISoN is slightly overestimating zeroes compared to point estimates (or the point estimates might be underestimating the edge weights) 
+# similar to what mentioned above: this is because BISoN will never estimate tre zero's 
+# if there are (many) true zero's expected in the data, it might be good to add a zero-inflated part that can model true zero's as edges
+# this will depend on the behaviour observed (e.g. more 0's in grooming than proximity) & other factors (e.g. more 0's in male interactions)
+```
+
+# extract edge weights
+dyadic edge weights are now distributions which can be extracted as 
+- a matrix with one column per dyad & one row per sample
+- a distribution of adjacency matrices corresponding single draw of the posterior adjacency matrices 
+  (stored in a 'tensor': a multidimensional matrix)
+- an edgelist with uncertainty (i.e. 2.5% & 97.5% CI)
+
+```{r}
+# matrix with one column per dyad & one row per sample
+rates_samples <- exp(log_rates_samples) # exponentiating the log_p samples to get back at the real values
+colnames(rates_samples) <- edgelist$dyad
+
+name_matrix <- paste0("matrices of edge weight samples/", name_dataset, "edge_weight_samples.csv")
+
+write_csv(as.data.frame(rates_samples), name_matrix) 
+
+# distribution of adjacency matrices 
+adj_tensor <- array(0, c(nr_ind, nr_ind, nr_samples)) # create empty multidimensional matrix
+for (i in 1:nrow(edgelist)) { # fill it with samples from the distribution
+  adj_tensor[edgelist[i,"ID2_id"][[1]], edgelist[i,"ID1_id"][[1]],] <- rates_samples[1:nr_samples, i]
+}
+# View(adj_tensor[, , 1]) # see how 1 of adjecency those matrixes looks like
+
+name_tensor <- paste0("tensors of adjecency matrices/", name_dataset, "adjecency_matrices.rds")
+
+saveRDS(adj_tensor, name_tensor)
+
+# edgelist with 2.5% & 97.5% CI
+prob_edgelist <- round(exp(summary(fit_inla)$fixed[, c(1, 3, 5)]), 2)
+colnames(prob_edgelist) <- c("50%", "2.5%", "97.5%")
+prob_edgelist <- as.data.frame(prob_edgelist)
+prob_edgelist <- cbind(dyad = substring(rownames(prob_edgelist),5), prob_edgelist)
+
+name_edgelist <- paste0("edgelists with uncertainty/", name_dataset, "edgelist_with_uncertainty.csv")
+
+write_csv(prob_edgelist, name_edgelist) 
+```
+
+# visualise uncertainty
+to plot a network with a visualisation of the uncertainty around edge weights add a semi-transparent line around each edge with a width that corresponds to the uncertainty measure (the normalised difference between the 97.5% and 2.5% credible interval estimate for each edge weigh) to do this, generate two igraph objects (one for the main network & one for the uncertainty in edges) and plot them with the same coordinates, so they appear on top of each other
+
+```{r, fig.width=8}
+# calculate lower, median, and upper quantiles of edge weights
+adj_quantiles <- apply(adj_tensor, c(1, 2), function(x) quantile(x, probs=c(0.025, 0.5, 0.975)))
+adj_lower <- adj_quantiles[1, , ] # 2.5% credible interval
+adj_mid <- adj_quantiles[2, , ]
+adj_upper <- adj_quantiles[3, , ] # 97.5% credible interval
+adj_range <- (adj_upper - adj_lower)
+
+# set threshold for minimum edge weight of edges to be shown on network
+threshold <- 0
+
+# generate two igraph objects, one form the median and one from the error range
+g_mid <- graph_from_adjacency_matrix(adj_mid * (adj_mid > threshold), mode="undirected", weighted=TRUE) # edges 
+g_range <- graph_from_adjacency_matrix(adj_range * (adj_mid > threshold), mode="undirected", weighted=TRUE) # error around edges
+
+# plot the median graph first and then the error range to show uncertainty over edges # NEEDS TWEAKING TO MAKE FIGURE LOOK GOOD LATER
+coords <- igraph::layout_nicely(g_mid)
+# coords <- igraph::layout.circle(g_mid)
+plot(g_mid, edge.width=2 * E(g_mid)$weight, edge.color="black",  layout=coords, vertex.size=3) 
+plot(g_mid, edge.width=5 * E(g_range)$weight, edge.color=rgb(0, 0, 0, 0.25), 
+     vertex.label=unique_names, vertex.size=3,
+     vertex.label.dist=0.5, vertex.label.color="black", layout=coords, add=TRUE)
+```
+
+# calculate network metrics
+now that the edges are probabilities, incorporate that uncertainty further down into calculations of network metrics
+
+```{r}
+# calculating density 
+dens <- rep(0, nr_samples) # create empty vector 
+for (i in 1:nr_samples) { # and fill with densities calculated from samples taken from edge posterior probabilities
+  s <- sum(adj_tensor[, , i])
+  dens[i] <- s/nr_dyads 
+}
+
+# plot the distribution of the network density values
+plot(density(dens), xlab="network density")
+
+# save posterior draws of network density to use in further analyses
+name_network_density <- paste0("network densities/", name_dataset, "posterior_network_density.csv")
+write_csv(data.frame(draws=dens), name_network_density)
+```
+
+# save workspace
+
+```{r}
+# save.image("~/Documents/MACAQUE R PACKAGE/BISoN/2. edgelists to BISoN.RData")
+```
