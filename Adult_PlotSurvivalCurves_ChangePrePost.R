@@ -66,6 +66,7 @@ setwd('~/Documents/Github/Cayo-Maria-Survival/Results/')
 ggplot(data, aes(x=as.factor(Survival), y=dpAcc))+
   geom_violin()+xlab('')+ylab('Change in p(proximity) pre-to-post hurricane')+
   geom_boxplot(width=0.25)+ 
+  geom_jitter(width=0.1,size = 2, alpha=0.7)+
   theme_classic(base_size = 15)+ scale_x_discrete(labels= c("alive","dead"))
   #+facet_grid(~group)
 ggsave("dpProx_Survival_Violin.png")
@@ -75,6 +76,7 @@ sum(data$Survival[data$sex=='F'])/length(which(data$sex=='F'));sum(data$Survival
 ggplot(data, aes(x=as.factor(Survival), y=dpSocial))+
   geom_violin()+xlab('')+ylab('Change in p(grooming)')+
   geom_boxplot(width=0.25)+ 
+  geom_jitter(width=0.1,size = 2, alpha=0.7)+ 
   theme_classic(base_size = 15)+ scale_x_discrete(labels= c("alive","dead"))
 ggsave("dpSocial_Survival_Violin.png")
 mean(data$dpSocial[data$Survival==0]); mean(data$dpSocial[data$Survival==1])
@@ -87,7 +89,7 @@ mean(data$dpSocial[data$Survival==0]); mean(data$dpSocial[data$Survival==1])
 #####################################################
 setwd("~/Documents/GitHub/Cayo-Maria-Survival/Results/Survival_curves/")
 
-surv.prox<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~dpAcc.cat + sex+ ordrank+ group,data=data)
+surv.prox<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~dpAcc.cat + sex+ ordrank+ group +year.prehurr +hrs.followed,data=data)
 summary(surv.prox)
 
 ##dpAcc model##
@@ -95,18 +97,22 @@ dpAcc_df<-with(data,
                data.frame(dpAcc.cat =c("Small", "Medium", "High"),
                           sex= c("F","F","F"), #identifies the levels within the variable sex
                           group = c("V","V","V"), #Holds the effects of Group size constant at lowest value for both sexes
-                          ordrank= c("L","L","L")#Holds the effects of rank constant at lowest value for both sexes
+                          ordrank= c("H","H","H"),#Holds the effects of rank constant at lowest value for both sexes
+                          year.prehurr = c("2016", "2016", "2016")
                )
 )
 dpAcc_df
 fitAcc<-survfit(surv.prox, newdata = dpAcc_df)
+ggsurvplot(fitAcc, data = data, xlim=c(2500,8500), xlab="Age in days", conf.int = T, legend ="bottom", legend.title = "Change in p(proximity)",legend.labs=c("Small", "Medium", "High"), ggtheme = theme_minimal())
+
 
 ##sex model##
 sex_df<-with(data,
              data.frame(dpAcc.cat =c("Small", "Small"),
                         sex= c("M","F"), #identifies the levels within the variable sex
                         group = c("V","V"), #Holds the effects of Group size constant at lowest value for both sexes
-                        ordrank= c("L","L")#Holds the effects of rank constant at lowest value for both sexes
+                        ordrank= c("L","L"),#Holds the effects of rank constant at lowest value for both sexes
+                        year.prehurr = c("2016", "2016")
              )
 )
 sex_df
@@ -118,7 +124,8 @@ group_df<-with(data,
                data.frame(dpAcc.cat =c("Small", "Small"),
                           sex= c("F","F"), #identifies the levels within the variable sex
                           group = c("V","KK"), #Holds the effects of Group size constant at lowest value for both sexes
-                          ordrank= c("L","L")#Holds the effects of rank constant at lowest value for both sexes
+                          ordrank= c("L","L"),#Holds the effects of rank constant at lowest value for both sexes
+                          year.prehurr = c("2016", "2016")
                )
 )
 fitG<-survfit(surv.prox,newdata = group_df)
@@ -128,7 +135,8 @@ Rank_df<-with(data,
               data.frame (dpAcc.cat =c("Small", "Small","Small"),
                           sex= c("F","F","F"), #identifies the levels within the variable sex
                           group = c("V","V","V"), #Holds the effect of sex constant across groups
-                          ordrank= c("L","M","H") #identifies the levels within rank (high, median, low)
+                          ordrank= c("L","M","H"), #identifies the levels within rank (high, median, low)
+                          year.prehurr = c("2016", "2016", "2016")
               )
 )
 fitR<-survfit(surv.prox,newdata = Rank_df)
