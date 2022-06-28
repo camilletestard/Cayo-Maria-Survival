@@ -1,4 +1,5 @@
 #Get_SocialityMetric_IDPerYear.R
+#This script generates 
 
 library(stringr)
 library(igraph)
@@ -9,8 +10,7 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 library(ggplot2)
-library(lmerTest)
-library(lme4)
+
 
 # group = c("F","KK","F","HH","F","V","R","KK","R","V","F","HH","F","KK","V","S","V","F","V")
 # years = c(2013, 2013,2014,2014,2015,2015,2015,2015,
@@ -31,9 +31,9 @@ groupyears = c("F2015","V2015","R2015","KK2015",
                "R2016","V2016","F2016","HH2016",
                "F2017","KK2017","V2017","V2018","KK2018",
                "S2019","V2019","F2021","V2021") 
-gy=15
+gy=4
 SocialCapital.ALL = data.frame()
-savePath = '~/Documents/GitHub/Cayo-Maria-Survival/R.Data/'
+savePath = '~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data/'
 
 for (gy in 1:length(groupyears)){ #for all group & years
   
@@ -43,9 +43,16 @@ for (gy in 1:length(groupyears)){ #for all group & years
   if (years[gy]==2018) {
     
     #Load data
-    setwd('~/Documents/GitHub/Cayo-Maria-Survival/Data All Cleaned/BehavioralDataFiles')
+    setwd('~/Documents/GitHub/Cayo-Maria-Survival/Data/Data All Cleaned/BehavioralDataFiles')
     scans2018= read.csv(paste("Group",groupyears[gy],"_scansamples_FULL_CLEANED.csv", sep = ""))
     meta_data = read.csv(paste("Group",groupyears[gy],"_GroupByYear.txt", sep = "")) #load meta data
+    
+    #Creat focal cutoff value
+    
+    #Initialize SocialCaiptalData
+    SocialCapitalData= meta_data[,c("id","sex","age","ordinal.rank","percofsex.dominanted","hrs.focalfollowed","focalcutoff_met")]
+    SocialCapitalData$group = group[gy]
+    SocialCapitalData$year = years[gy]
     
     ##Format data##
     scans2018$date <- lubridate::mdy(as.character(scans2018$date))
@@ -115,55 +122,73 @@ for (gy in 1:length(groupyears)){ #for all group & years
     #############################
     ### Get proximity metrics ###
     
-    SocialCapitalData= meta_data[meta_data$numObs>20,c("id","sex","age","ordinal.rank","percofsex.dominanted","hrs.focalfollowed")]
-    SocialCapitalData$group = group[gy]
-    SocialCapitalData$year = years[gy]
+    groom_data = scans2018[scans2018$focal.activity=="social",c("focalID","partner.ID")]
+    prox_data =  scans2018[,c("focalID","in.proximity")]
     
-    SocialCapitalData[,c("num.partners","groom.events","groom.dur","groom.rate")] = NA
-    
-    proxRate = data.frame()
-    for (id in 1:nrow(SocialCapitalData)){
-      proxRate[id, 'id'] = SocialCapitalData$id[id]
-      proxRate[id, 'prox.events'] = sum(scans2018$isProx[scans2018$focalID == SocialCapitalData$id[id]])
-      proxRate[id, 'numScans'] = length(scans2018$isProx[scans2018$focalID == SocialCapitalData$id[id]])
-      proxRate[id, 'numP.prox'] = sum(scans2018$num.prox[scans2018$focalID == SocialCapitalData$id[id]])
-      proxRate[id, 'groom.events'] = sum(scans2018$isSocial[scans2018$focalID == SocialCapitalData$id[id]])
+    unqIDs = as.character(meta_data$id); social.data = data.frame(); id=1
+    for (id in 1:length(unqIDs)){
+      
+      social.data[id, "id"]= unqIDs[id]
+      scans = which(prox_data$focalID == unqIDs[id])
+      social.data[id, "numscans"]=length(scans)
+      
+      #get number of unique partners in proximity
+      prox.scans = prox_data[scans,]
+      id.in.prox = str_split(prox.scans$in.proximity, c(","))
+      unique.partners.prox = unique(unlist(c(id.in.prox)))
+      unique.partners.prox =as.character(gsub("'",'',unique.partners.prox))
+      if(length(which(unique.partners.prox =="N/A")!=0)){unique.partners.prox =unique.partners.prox[-which(unique.partners.prox =="N/A")]}
+      if(length(which(is.na(unique.partners.prox))!=0)){unique.partners.prox =unique.partners.prox[-which(is.na(unique.partners.prox))]}
+      
+      social.data[id,"num.prox.partners"] = length(unique.partners.prox)
+      social.data[id,"adj.num.prox.partners"] = social.data[id,"num.prox.partners"]/social.data[id, "numscans"] #NOT SURE HWO TO ADJUST FOR NUMBER OF PROXIMITY PARTNERS HERE
+      social.data[id,"num.prox.events"] = length(which(!is.na(prox.scans$in.proximity)))
+      
+      groom.scans = groom_data[which(groom_data$focalID == unqIDs[id]),]
+      id.groom = unique(str_trim(unlist(str_split(unique(groom.scans$partner.ID),c(",")))))
+      if(length(which(id.groom =="N/A")!=0)){id.groom =id.groom[-which(id.groom =="N/A")]}
+      if(length(which(is.na(id.groom))!=0)){unique.partners.prox =unique.partners.prox[-which(is.na(id.groom))]}
+      
+      social.data[id,"num.groom.partners"] = length(id.groom)
+      social.data[id,"adj.num.groom.partners"] = social.data[id,"num.groom.partners"]/social.data[id, "numscans"]
+      social.data[id,"num.groom.events"] = nrow(groom.scans)
+      
+      # plot(social.data$num.groom.partners, social.data$num.prox.partners)
+      # plot(social.data$numscans, social.data$num.prox.partners)
+      # plot(social.data$numscans, social.data$num.groom.partners)
+      
     }
-    proxRate$prob.prox = proxRate$prox.events / proxRate$numScans
     
-    SocialCapitalData$numP.prox = proxRate$numP.prox[match(SocialCapitalData$id,proxRate$id)]
-    SocialCapitalData$prox.events = proxRate$prox.events[match(SocialCapitalData$id,proxRate$id)]
-    SocialCapitalData$numScans = proxRate$numScans[match(SocialCapitalData$id,proxRate$id)]
-    SocialCapitalData$prob.prox = proxRate$prob.prox[match(SocialCapitalData$id,proxRate$id)]
-    SocialCapitalData$groom.events = proxRate$groom.events[match(SocialCapitalData$id,proxRate$id)]
-    
+    SocialCapitalData[,c("numPartnersGroom","top.partner.DSI","groom.events.focal","groom.dur","groom.rate")] = NA
+    SocialCapitalData$numScans = social.data$numscans
+    SocialCapitalData$numPartnersProx = social.data$num.prox.partners
+    SocialCapitalData$prox.events = social.data$num.prox.events
+    SocialCapitalData$prob.prox = social.data$num.prox.events/social.data$numscans
+    SocialCapitalData$numPartnersGroom= social.data$num.groom.partners
+    SocialCapitalData$groom.events.scans= social.data$num.groom.events
+    SocialCapitalData$prob.groom =  SocialCapitalData$groom.events.scans/SocialCapitalData$numScans
+
     #############################
     ### Get aggression metrics ###
     
+    agg_data = scans2018[scans2018$focal.activity=="social",c("focalID","partner.ID")]
     aggRate = data.frame()
     for (id in 1:nrow(SocialCapitalData)){
       aggRate[id, 'id'] = SocialCapitalData$id[id]
-      aggRate[id, 'agg.events'] = sum(scans2018$isAgg[scans2018$focalID == SocialCapitalData$id[id]])
+      scans_id = scans2018[scans2018$focalID == SocialCapitalData$id[id],]
+      aggRate[id, 'agg.events'] = sum(scans_id$isAgg)
+      aggRate[id, "agg.partners"]= length(unique(scans_id$partner.ID[scans_id$isAgg==1]))
     }
     SocialCapitalData$agg.events = aggRate$agg.events[match(SocialCapitalData$id,aggRate$id)]
     SocialCapitalData$agg.rate = SocialCapitalData$agg.events/SocialCapitalData$hrs.focalfollowed
-    
-    #############################
-    ### Get grooming metrics ###
-    
-    groomRate = data.frame()
-    for (id in 1:nrow(SocialCapitalData)){
-      groomRate[id, 'id'] = SocialCapitalData$id[id]
-      groom[id, 'groom.events'] = sum(scans2018$isSocial[scans2018$focalID == SocialCapitalData$id[id]])
-    }
-    SocialCapitalData$groom.events = groomRate$groom.events[match(SocialCapitalData$id,groomRate$id)]
-    SocialCapitalData$groom.rate = SocialCapitalData$groom.events/SocialCapitalData$hrs.focalfollowed
-    
-    
+    SocialCapitalData$numPartnersAgg = aggRate$agg.partners
+   
+  ############################################################################
   }else{ #if not 2018 (i.e. regular focal data)
+  ############################################################################ 
     
     #Load data
-    setwd('~/Documents/GitHub/Cayo-Maria-Survival/Data All Cleaned/BehavioralDataFiles')
+    setwd('~/Documents/GitHub/Cayo-Maria-Survival/Data/Data All Cleaned/BehavioralDataFiles')
     groom_data = read.csv(paste("Group",groupyears[gy],"_GroomingEvents.txt", sep = ""))
     agg_data = read.csv(paste("Group",groupyears[gy],"_AgonisticActions.txt", sep = ""))
     focal_data = read.csv(paste("Group",groupyears[gy],"_FocalData.txt", sep = ""))
@@ -171,10 +196,32 @@ for (gy in 1:length(groupyears)){ #for all group & years
     meta_data = read.csv(paste("Group",groupyears[gy],"_GroupByYear.txt", sep = "")) #load meta data
     #cleaned_data = read.csv(paste("Group",groupyears[gy],"_CleanedData.txt", sep = ""))
     
-    SocialCapitalData= meta_data[meta_data$focalcutoff_met=="Y",c("id","sex","age","ordinal.rank","percofsex.dominanted","hrs.focalfollowed")]
+    #Set NA focal activity in scans to "Rest"
+    prox_data$focal.activity[is.na(prox_data$focal.activity)]="rest"
+    
+    SocialCapitalData= meta_data[,c("id","sex","age","ordinal.rank","percofsex.dominanted","hrs.focalfollowed","focalcutoff_met")]
     SocialCapitalData$group = group[gy]
     SocialCapitalData$year = years[gy]
     
+    if (group[gy]=="HH"){
+      #Add HH dominance for subadults. 
+      hh.dominance <- read.csv("HH_Dominance.csv");names(hh.dominance)[1]="id"
+      hh.dominance$id = as.character(hh.dominance$id)
+      hh.dominance$id[hh.dominance$id=="2.00E+09"]="2E9"
+      hh.dominance$id[hh.dominance$id=="2.00E+08"]="2E8"
+      hh.dominance$id[hh.dominance$id=="7.00E+00"]="7E0"
+      hh.dominance$id[hh.dominance$id=="7.00E+03"]="7E3"
+      hh.dominance$id[hh.dominance$id=="8.00E+02"]="8E2"
+      
+      SocialCapitalData[,c("ordinal.rank","percofsex.dominanted")]=hh.dominance[match(SocialCapitalData$id, hh.dominance$id),c("ordinal.rank","percofsex.domianted")]
+    }
+    
+    if (groupyears[gy]=="KK2017"){
+      #Add HH dominance for juveniles. 
+      kk.dominance <- read.csv("KK_dominance_withSubadults.csv");names(kk.dominance)[1]="id"
+      
+      SocialCapitalData[,c("ordinal.rank","percofsex.dominanted")]=kk.dominance[match(SocialCapitalData$id, kk.dominance$id),c("ordinal.rank","percofsex.domianted")]
+    }
     #####################################################################
     ## Extract social integration measure from grooming data
     #Number of grooming partners
@@ -200,11 +247,13 @@ for (gy in 1:length(groupyears)){ #for all group & years
     id=1; social_integration= data.frame(); partner_strength=matrix(NA, nrow = length(unqIDs), ncol=20); partner_DSI=matrix(NA, nrow = length(unqIDs), ncol=20)
     for (id in 1:length(unqIDs)){
       social_integration[id,"id"] = unqIDs[id];
-      social_integration[id,"groom.events"] = sum(prox_data$focal.activity[prox_data$focal.monkey == unqIDs[id]] == "social")
+      social_integration[id,"groom.events.scans"] = sum(prox_data$focal.activity[prox_data$focal.monkey == unqIDs[id]] == "social")
       partners = unique(c(groom_data_compiled$receiver[groom_data_compiled$giver == unqIDs[id]],
                           groom_data_compiled$giver[groom_data_compiled$receiver == unqIDs[id]]))
       social_integration[id,"groom.rec"] = sum(groom_data_compiled$constrained_duration[groom_data_compiled$receiver == unqIDs[id]])
       social_integration[id,"groom.give"] = sum(groom_data_compiled$constrained_duration[groom_data_compiled$giver == unqIDs[id]])
+      social_integration[id,"groom.events.focal"] = length(groom_data_compiled$constrained_duration[groom_data_compiled$receiver == unqIDs[id]])+
+        length(groom_data_compiled$constrained_duration[groom_data_compiled$giver == unqIDs[id]])
       if (length(partners)!=0){
         for (p in 1:length(partners)){
           partner_strength[id,p]= groomMat[unqIDs[id], partners[p]] + groomMat[partners[p], unqIDs[id]]
@@ -212,16 +261,19 @@ for (gy in 1:length(groupyears)){ #for all group & years
         }
       }else{
         partner_DSI[id, 1]=0}
-      social_integration[id,"num.partners"] = length(partners)
+      social_integration[id,"numPartnersGroom"] = length(partners)
       social_integration[id,"top.partner"] = max(partner_DSI[id,], na.rm = T)
     }
     mean_groom_rate = mean(partner_DSI, na.rm = T)
     social_integration$top.partner.DSI=social_integration$top.partner/mean_groom_rate
-    social_integration$std.num.partners = social_integration$num.partners/mean(social_integration$num.partners)
+    social_integration$std.numPartnersGroom = social_integration$numPartnersGroom/mean(social_integration$numPartnersGroom)
     social_integration$groom.dur = (social_integration$groom.rec + social_integration$groom.give)
     social_integration$groom.rate = social_integration$groom.dur/SocialCapitalData$hrs.focalfollowed[match(social_integration$id, SocialCapitalData$id)]
     
-    SocialCapitalData[,c("num.partners","groom.events","groom.dur","groom.rate")] = social_integration[match(SocialCapitalData$id, social_integration$id),c("num.partners","groom.events","groom.dur","groom.rate")]
+    SocialCapitalData[,c("numPartnersGroom","top.partner.DSI","groom.events.focal",
+                         "groom.dur","groom.rate","groom.events.scans")] = 
+      social_integration[,c("numPartnersGroom","top.partner.DSI","groom.events.focal",
+                            "groom.dur","groom.rate","groom.events.scans")]
     
     #####################################################################
     ## Extract social integration measure from proximity data
@@ -245,7 +297,17 @@ for (gy in 1:length(groupyears)){ #for all group & years
       scans = which(prox_partners$focalID == unqIDs[id]) #find the number of scans where focal ID = id
       proxRate[id, "numScans"] = length(scans) #num scans
       proxRate[id, "numPartners"] = 0; proxRate[id, "is.in.prox"] = 0;
-      #Find the number of partners
+      
+      #Number of unique proximity partners
+      prox.scans = prox_data[scans,]
+      id.in.prox = str_split(prox.scans$in.proximity, c(","))
+      unique.partners.prox = unique(unlist(c(id.in.prox)))
+      unique.partners.prox =as.character(gsub("'",'',unique.partners.prox))
+      if(length(which(unique.partners.prox =="N/A")!=0)){unique.partners.prox =unique.partners.prox[-which(unique.partners.prox =="N/A")]}
+      if(length(which(is.na(unique.partners.prox))!=0)){unique.partners.prox =unique.partners.prox[-which(is.na(unique.partners.prox))]}
+      proxRate[id,"num.prox.partners"] = length(unique.partners.prox)
+      
+      #Find the number of partners in proximity at each scan
       for (i in 1:length(scans)){ #for all scans of id
         numProxPartners = length(which(prox_partners[scans[i],2:length(prox_partners)] != "")) #find the number of partners at that scan
         proxRate[id, "numPartners"] = proxRate[id, "numPartners"] + numProxPartners #add #partners through scans
@@ -256,10 +318,11 @@ for (gy in 1:length(groupyears)){ #for all group & years
     proxRate$proxRate = proxRate$numPartners/proxRate$numScans #rate is the average number of partner per proximity scan
     proxRate$probProx = proxRate$is.in.prox/proxRate$numScans
     
-    SocialCapitalData$numP.prox = proxRate$numPartners[match(SocialCapitalData$id,proxRate$id)]
-    SocialCapitalData$prox.events = proxRate$is.in.prox[match(SocialCapitalData$id,proxRate$id)]
-    SocialCapitalData$numScans = proxRate$numScans[match(SocialCapitalData$id,proxRate$id)]
-    SocialCapitalData$prob.prox = proxRate$probProx[match(SocialCapitalData$id,proxRate$id)]
+    SocialCapitalData$numScans = proxRate$numScans
+    SocialCapitalData$numPartnersProx = proxRate$num.prox.partners
+    SocialCapitalData$prox.events = proxRate$is.in.prox
+    SocialCapitalData$prob.prox = proxRate$probProx
+    SocialCapitalData$prob.groom =  SocialCapitalData$groom.events.scans/SocialCapitalData$numScans
     
     #####################################################################
     ## Extract aggression rate
@@ -270,18 +333,33 @@ for (gy in 1:length(groupyears)){ #for all group & years
       aggressionRate[id, "id"]= unqIDs[id]
       aggressionRate[id, "agg.events"]=length(which(agg_data$agonism_winner == unqIDs[id] |
                                                       agg_data$agonism_loser == unqIDs[id]))
+      aggressionRate[id, "agg.partners"]= length(unique(c(agg_data$agonism_loser[which(agg_data$agonism_winner == unqIDs[id])], 
+       agg_data$agonism_winner[which(agg_data$agonism_loser == unqIDs[id])])))
     }
     SocialCapitalData$agg.events = aggressionRate$agg.events[match(SocialCapitalData$id, aggressionRate$id)]
     SocialCapitalData$agg.rate = SocialCapitalData$agg.events/SocialCapitalData$hrs.focalfollowed
+    SocialCapitalData$numPartnersAgg = aggressionRate$agg.partners
     
   } #end of year clause (2018 vs. other)
   
+  col_order = c("id","sex","age","ordinal.rank","percofsex.dominanted",
+                "hrs.focalfollowed","numScans","focalcutoff_met","group","year",     
+                "groom.dur","groom.rate","numPartnersGroom","top.partner.DSI",
+                "groom.events.focal","groom.events.scans","prob.groom",          
+                "prox.events","prob.prox","numPartnersProx",
+                "agg.events","agg.rate","numPartnersAgg")
+  SocialCapitalData=SocialCapitalData[,col_order]
   ###################################################################
   # Merge and save data
   SocialCapital.ALL = rbind(SocialCapital.ALL, SocialCapitalData)
 }
 SocialCapital.ALL$isPost ="pre"; SocialCapital.ALL$isPost[SocialCapital.ALL$year>2017]="post"; 
 SocialCapital.ALL$isPost.year ="pre"; SocialCapital.ALL$isPost.year[SocialCapital.ALL$year==2018]="post2018"; SocialCapital.ALL$isPost.year[SocialCapital.ALL$year==2019]="post2019"; SocialCapital.ALL$isPost.year[SocialCapital.ALL$year==2021]="post2021";
-SocialCapital.ALL$prob.groom = SocialCapital.ALL$groom.events/SocialCapital.ALL$numScans
+
+SocialCapital.ALL.cutoffmet=SocialCapital.ALL[SocialCapital.ALL$focalcutoff_met=="Y",]
   
-save(SocialCapital.ALL, file=paste(savePath, 'SocialCapital.ALL.RData', sep=""))
+# indices=which(is.na(SocialCapital.ALL.cutoffmet),arr.ind = T)
+# test=SocialCapital.ALL.cutoffmet[unique(indices[,1]),]
+
+save(SocialCapital.ALL.cutoffmet, file=paste(savePath, 'SocialCapital.ALL.RData', sep=""))
+

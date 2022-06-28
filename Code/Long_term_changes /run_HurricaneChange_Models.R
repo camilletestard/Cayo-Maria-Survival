@@ -1,14 +1,17 @@
 #run_HurricaneChange_Models.R
-#Run models on change in sociality includiong 2019 and 2021
+#Run models on change in sociality including 2019 and 2021
 #IMPORTANT NOTE: for now we don't inlcude rank because we're missing rank for 2021 individuals
 
 library(ggplot2)
 library(forcats)
 library(lme4)
+library(dplyr)
+library(glmmTMB)
 
 #Load data
-setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data/')
+setwd('~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data/')
 load("SocialCapital.ALL.RData")
+SocialCapital.ALL=SocialCapital.ALL.cutoffmet
 
 ###################
 ### Format data ###
@@ -19,24 +22,48 @@ SocialCapital.ALL<-within(SocialCapital.ALL,{
   id<-as.factor(id)
   isPost<-as.factor(isPost)
   isPost.year<-as.factor(isPost.year)
-  year <- as.factor(year)
+  year.scaled <- scale(year)
 })
 SocialCapital.ALL$group.year = paste(SocialCapital.ALL$group, SocialCapital.ALL$year, sep="")
 
 #If only consider IDs present both pre and post
 id.isPost = table(SocialCapital.ALL$id, SocialCapital.ALL$isPost)
+id.year = table(SocialCapital.ALL$id, SocialCapital.ALL$year); 
+# Visualize sampling across years
+# data_melt <- melt(id.year) 
+# ggplot(data_melt, aes(Var2, Var1)) +                           # Create heatmap with ggplot2
+#   geom_tile(aes(fill = value))+ 
+#   scale_fill_gradient(low = "white", high = "red", limits=c(0, 1))
+
+
 id_pre = row.names(as.data.frame(which(id.isPost[,"pre"]>0))); id_post = row.names(as.data.frame(which(id.isPost[,"post"]>0)))
 id.PreAndPost = as.data.frame(row.names(as.data.frame(which(id.isPost[,"pre"]>0 & id.isPost[,"post"]>0)))); names(id.PreAndPost)="id"
 id.PreAndPost$group = SocialCapital.ALL$group[match(id.PreAndPost$id, SocialCapital.ALL$id)]
 table(id.PreAndPost$group)
 SocialCapital.prepost = subset(SocialCapital.ALL, id %in% id.PreAndPost$id)
 
+#plot data per individual for all years
+# id.year.prepost = table(SocialCapital.prepost$id, SocialCapital.prepost$year);
+# data_melt <- melt(id.year.prepost) 
+# ggplot(data_melt, aes(Var2, Var1)) +                           # Create heatmap with ggplot2
+#   geom_tile(aes(fill = value))+ 
+#   scale_fill_gradient(low = "white", high = "red", limits=c(0, 1))
+
+
+
 data = SocialCapital.prepost; data = subset(data, group %in% c("KK","F","V")) #Only consider within-individual comparisons
 #data = SocialCapital.ALL #OR whole data
 only.post<- droplevels(subset(data, isPost.year %in% c("post2018","post2019","post2021")))
 
-# #If exclude 2018 data 
+#If exclude 2018 data (because it is so different in structure...)
 # data <- data[data$year!="2018",]
+
+#Adjust levels
+data = data %>%
+  mutate(isPost = fct_relevel(isPost, 
+                              "pre", "post")) %>%
+  mutate(isPost.year = fct_relevel(isPost.year, 
+                              "pre", "post2018","post2019","post2021")) 
 
 ############################
 ### Plot amount of data ###
@@ -65,8 +92,6 @@ data %>%
 
 #Plot pre vs. post hurricane
 data %>%
-  mutate(isPost = fct_relevel(isPost, 
-                              "pre", "post")) %>%
   ggplot(aes(x=isPost, y=agg.rate, fill=isPost))+
   geom_violin(scale ="width")+ geom_jitter(width = 0.1, alpha = 0.7)+
   theme_classic(base_size=15)+
@@ -74,8 +99,6 @@ data %>%
 
 #Show different years
 data %>%
-  mutate(isPost = fct_relevel(isPost, 
-                              "pre", "post")) %>%
   ggplot(aes(x=year, y=agg.rate, fill=isPost))+
   geom_violin(scale ="width")+ geom_jitter(width = 0.1, alpha = 0.7)+
   theme_light(base_size=15)+theme(axis.text.x = element_text(angle = 45))+
@@ -99,10 +122,10 @@ mean(data$agg.rate[data$isPost.year=="post2021"])
 table(data$isPost.year)
 table(data$group, data$isPost)
 
-agg.model<-glmer(agg.events~ isPost*group + sex +age + hrs.focalfollowed+ (1|id), data = data, family = poisson((link = "log")))
+agg.model<-glmer(agg.events~ isPost*group + sex +age + offset(log(hrs.focalfollowed))+ (1|id), data = data, family = poisson((link = "log")))
 summary(agg.model)
 
-agg.model.post<-  glmer(agg.events~ isPost.year + sex + group+ hrs.focalfollowed+ (1|id),data=only.post,family = poisson((link = "log")))
+agg.model.post<-  glmer(agg.events~ year.scaled+group+ sex + age + offset(log(hrs.focalfollowed))+ (1|id),data=only.post,family = poisson((link = "log")))
 summary(agg.model.post)
 
 ############################################
@@ -143,8 +166,8 @@ mean(data$prob.prox[data$isPost.year=="pre"]);
 mean(data$prob.prox[data$isPost.year=="post2019"])
 mean(data$prob.prox[data$isPost.year=="post2021"])
 
-data$prox.events<-scale(data$prox.events)
-prox.model<-glmer(prox.events~ isPost*group + sex + numScans+ (1|id), data = data, family = poisson((link = "log")))
+data$numScans<-scale(data$numScans)
+prox.model<-glmer(prob.prox~ isPost*group + sex + age + offset(numScans)+ (1|id), data = data, family = binomial)
 summary(prox.model)
 
 ##########################################################################
@@ -168,7 +191,7 @@ summary(groom.model)
 data %>%
   mutate(isPost = fct_relevel(isPost, 
                               "pre", "post")) %>%
-  ggplot(aes(x=year, y=groom.rate, fill=isPost))+
+  ggplot(aes(x=year, y=num.partners, fill=isPost))+
   geom_violin(scale ="width")+ geom_jitter(width = 0.1, alpha = 0.7)+
   theme_light(base_size=15)+
   geom_vline(xintercept = 3.5, linetype = "dashed", colour = "red")+

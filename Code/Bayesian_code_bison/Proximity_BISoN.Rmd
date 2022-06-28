@@ -22,9 +22,7 @@ library(magrittr)
 library(igraph)
 
 #Load functions
-setwd("~/Documents/GitHub/Cayo-Maria-Survival/Bayesian_code_bison/")
-#source("scripts/simulations.R")
-source("scripts/sampler.R")
+setwd("~/Documents/GitHub/Cayo-Maria-Survival/Code/Bayesian_code_bison/")
 source("scripts/functions_GlobalNetworkMetrics.R")
 ```
 # Create edgelist - format from cayo data
@@ -36,15 +34,16 @@ year=2016
 groupyear = paste(group,year,sep="")
 
 #Load cayo data
-dataPath = '~/Documents/GitHub/Cayo-Maria-Survival/Data All Cleaned/BehavioralDataFiles/'
+dataPath = '~/Documents/GitHub/Cayo-Maria-Survival/Data/Data All Cleaned/BehavioralDataFiles/'
 prox_data = read.csv(paste(dataPath,"Group",groupyear,"_ProximityGroups.txt", sep=""))
 meta_data = read.csv(paste(dataPath,"Group",groupyear,"_GroupByYear.txt", sep=""))
 
 if (groupyear == "V2019"){ #quick fix for now
-      prox_data$in.proximity[!is.na(prox_data$partners.activity..sequential.)]=
-        paste(prox_data$focal.monkey[!is.na(prox_data$partners.activity..sequential.)],
-              prox_data$in.proximity[!is.na(prox_data$partners.activity..sequential.)],sep=",")
-    }
+  prox_idx = !is.na(prox_data$partners.activity..sequential.) #find indices where there are individuals in proximity
+  #add focal monkey in proximity column
+  prox_data$in.proximity[prox_idx]= paste(prox_data$focal.monkey[prox_idx], 
+                                          prox_data$in.proximity[prox_idx],sep=",")
+}
 
 #Format data with aggregate format
 # Output the Master Edgelist of all possible pairs given the unique IDs.
@@ -102,10 +101,19 @@ priors are set in log space, so that rates can only be positive
 ```
 
 ```{r}
+#PROBLEM: PRIORS NEED TO BE CHANGED.
+#gamma conjugate.
+
+#IMPORTANT NOTE: these priors are calibrated for rates of events over HOURS of observation, not number of scan samples.
+
+#Priors for number of events per hours observed.
 log_rate_mu <- 0
 log_rate_sigma <-1.5
 log_rates <- rnorm(1e5, log_rate_mu, log_rate_sigma) # sampling from the priors for visualisation
 plot(density(exp(log_rates))) # the peak at 0 is misleading, note the very small densities: it's only a tiny peak actually
+
+#Priors for number of events per scan samples:
+
 ```
 # fit the edge weight model
 
@@ -158,8 +166,7 @@ plot(
 )
 
 for (i in 1:20) {
-  points(df_obs_agg$count + rnorm(nr_dyads, sd=jitter_sd), rpois(nr_dyads, rates_bison * df_obs_agg$total_samples) +
-           rnorm(nr_dyads, sd=jitter_sd), col=rgb(0, 0, 1, 0.25))
+  points(df_obs_agg$count + rnorm(nr_dyads, sd=jitter_sd), rpois(nr_dyads, rates_bison * df_obs_agg$total_samples) + rnorm(nr_dyads, sd=jitter_sd), col=rgb(0, 0, 1, 0.25))
 }
 abline(a=0, b=1)
 
