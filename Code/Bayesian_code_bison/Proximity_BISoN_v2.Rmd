@@ -20,6 +20,7 @@ library(tidyverse)
 library(dplyr)
 library(magrittr)
 library(igraph)
+library(stringr)
 
 #Load functions
 setwd("~/Documents/GitHub/Cayo-Maria-Survival/Code/Bayesian_code_bison/")

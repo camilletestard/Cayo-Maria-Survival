@@ -12,14 +12,6 @@ library(glmmTMB)
 setwd('~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data/')
 load("SocialCapital.ALL.RData")
 SocialCapital.ALL=SocialCapital.ALL.cutoffmet
-# SocialCapital.ALL=SocialCapital.ALL[SocialCapital.ALL$year<=2018,]
-# SocialCapital.ALL$hrs.focalfollowed[SocialCapital.ALL$isPost=="post"]=SocialCapital.ALL$hrs.focalfollowed[SocialCapital.ALL$isPost=="post"]+1
-# SocialCapital.ALL$agg.rate=SocialCapital.ALL$agg.events/SocialCapital.ALL$hrs.focalfollowed
-
-#estimate observation time another way
-scan.time = 5
-SocialCapital.ALL$time.obs.scan = SocialCapital.ALL$numScans*5/3600
-# SocialCapital.ALL$hrs.focalfollowed[SocialCapital.ALL$year==2018] = SocialCapital.ALL$time.obs.scan[SocialCapital.ALL$year==2018]
 
 ###################
 ### Format data ###
@@ -59,16 +51,16 @@ SocialCapital.prepost = subset(SocialCapital.ALL, id %in% id.PreAndPost$id)
 #   scale_fill_gradient(low = "white", high = "red", limits=c(0, 1))
 
 
-data = SocialCapital.prepost; data = subset(data, group %in% c("KK","F","V")) #Only consider within-individual comparisons
-data = SocialCapital.ALL #OR whole data
-only.post<- droplevels(subset(data, isPost.year %in% c("post2018","post2019","post2021")))
-
-#Adjust levels
+data = SocialCapital.prepost; data = subset(data, group %in% c("F","V")) #Only consider within-individual comparisons
+data <- data[data$year!=2018,]
 data = data %>%
   mutate(isPost = fct_relevel(isPost,
                               "pre", "post")) %>%
   mutate(isPost.year = fct_relevel(isPost.year,
-                              "pre", "post2018","post2019","post2021"))
+                                   "pre", "post2019","post2021"))
+
+only.post<- droplevels(subset(data, isPost.year %in% c("post2019","post2021")))
+
 
 ############################
 ### Plot amount of data ###
@@ -76,13 +68,13 @@ data = data %>%
 setwd('~/Documents/GitHub/Cayo-Maria-Survival/Results/')
 
 data %>%
-  ggplot(aes(x=year.factor, y=hrs.focalfollowed, fill=isPost))+
+  ggplot(aes(x=year, y=hrs.focalfollowed, fill=isPost))+
   geom_violin(scale="width", width=1.5)+ geom_vline(xintercept = 3.5, linetype=2)+
   geom_jitter(width=0.1, alpha=0.7,size=1)+ facet_grid(~group)+theme_classic(base_size = 15)+
   theme(axis.text.x = element_text(angle = 90))
 
 data %>%
-  ggplot(aes(x=year.factor, y=numScans, fill=isPost))+
+  ggplot(aes(x=year, y=numScans, fill=isPost))+
   geom_violin(scale="width", width=1.5)+ geom_vline(xintercept = 3.5, linetype=2)+
   geom_jitter(width=0.1, alpha=0.7,size=1)+ facet_grid(~group)+theme_classic(base_size = 15)+
   theme(axis.text.x = element_text(angle = 90))
@@ -98,9 +90,6 @@ data %>%
   theme_classic(base_size=15)+
   ylab('Aggression rate')+ xlab('Hurricane Status')+ facet_grid(~ group)
 
-# (mean(data$agg.rate[data$isPost=="post" & data$group=="V"])-
-#     mean(data$agg.rate[data$isPost=="pre"& data$group=="V"]))/mean(data$agg.rate[data$isPost=="pre"& data$group=="V"])
-
 #Aggression rates across different years
 data %>%
   ggplot(aes(x=year.factor, y=agg.rate, fill=isPost))+
@@ -110,25 +99,18 @@ data %>%
   geom_vline(xintercept = 3.5, linetype = "dashed", colour = "red")+
   facet_grid(~ group)
 ggsave("AggressionRates_PrePost.png")
-
-#test=data[data$isPost=="pre",]
-data %>%
-  ggplot(aes(x=hrs.focalfollowed, y=agg.events, color=isPost.year))+
-  geom_point()+
-  theme_light(base_size=15)
-  
 #model aggression rates
-agg.model<-glmer(agg.events~ isPost*group + sex +age + offset(log(hrs.focalfollowed))+ (1|id), data = data, family = poisson((link = "log")))
+agg.model<-glmer(agg.events~ isPost*group + offset(log(hrs.focalfollowed))+ (1|id), data = data, family = poisson(link = "log"))
 summary(agg.model)
 
-# !!!!!!!!!!!!!!!!!!!!!!!!!!
-#Get the change across years..?
-agg.model.post<-  glmer(agg.events~ year.scaled+group+ sex + age + offset(log(hrs.focalfollowed))+ (1|id),data=only.post,family = poisson(link = "log"))
-summary(agg.model.post)
+# #Get the change across years..?
+# agg.model.post<-  glmer(agg.events~ year.scaled+group+ sex + age + offset(log(hrs.focalfollowed))+ (1|id),data=only.post,family = poisson((link = "log")))
+# summary(agg.model.post)
 
 #Number of aggression partners across different years
+data$std.numPartnersAgg= data$numPartnersAgg/data$hrs.focalfollowed
 data %>%
-  ggplot(aes(x=year.factor, y=numPartnersAgg, fill=isPost))+
+  ggplot(aes(x=year.factor, y=std.numPartnersAgg, fill=isPost))+
   geom_violin(scale ="width")+ geom_jitter(width = 0.1, alpha = 0.7)+
   theme_light(base_size=15)+theme(axis.text.x = element_text(angle = 45))+
   ylab('Num. aggression partners')+ xlab('Year')+ labs(fill="Hurricane Status")+
@@ -139,10 +121,10 @@ ggsave("NumPartnersAgg_PrePost.png")
 #model aggressive partners
 library(lmerTest)
 plot(density(data$numPartnersAgg))
-agg.model.partner<-glmer(numPartnersAgg~ isPost*group + offset(log(hrs.focalfollowed))+ (1|id), data = data,family = poisson(link = "log"))
+agg.model.partner<-glmer(numPartnersAgg~ isPost+group + offset(log(hrs.focalfollowed))+ (1|id), data = data, family = poisson(link = "log"))
 summary(agg.model.partner)
-#anova(agg.model.partner)
-#Important note 
+anova(agg.model.partner)
+
 
 # data %>%
 #   mutate(isPost = fct_relevel(isPost, 
@@ -163,6 +145,8 @@ summary(agg.model.partner)
 ### Test change in proximity ###
 ################################
 data %>%
+  mutate(isPost = fct_relevel(isPost, 
+                              "pre", "post")) %>%
   ggplot(aes(x=isPost, y=prob.prox, fill=isPost))+
   geom_violin(scale ="width")+ geom_jitter(width = 0.05, aes(alpha = 0.7))+ #geom_boxplot(width=0.25)+
   theme_classic(base_size=15)+
@@ -172,6 +156,8 @@ mean(data$prob.prox[data$isPost=="post"])
 
 #Plot change in p(proximity) across years
 data %>%
+  mutate(isPost = fct_relevel(isPost, 
+                              "pre", "post")) %>%
   ggplot(aes(x=year.factor, y=prob.prox, fill=isPost))+
   geom_violin(scale ="width")+ geom_jitter(width = 0.1, alpha = 0.7)+
   geom_vline(xintercept = 3.5, linetype=2)+
@@ -181,28 +167,16 @@ data %>%
   facet_grid(~ group)
 ggsave("ProximityRates_PrePost.png")
 
-#Check the linear relationship between observation effort and 
-#p(proximity)
-test=data[data$group.year=="V2017",]
-test %>%
-  ggplot(aes(x=numScans, y=prox.events, color=year.factor))+
-  geom_jitter()+
-  theme_light(base_size=15)
-# Number proximity events
-test %>%
-  ggplot(aes(x=numScans, y=prob.prox, color=year.factor))+
-  geom_jitter()+
-  theme_light(base_size=15)
-#IMPORTANT NOTE: there is a clear linear relationship between number of proximity events and 
-#observation effort in 2018 but not for other years. Probably because of the wide difference in observation effort
-
+#data$numScans<-scale(data$numScans)
 data$prob.prox[data$prob.prox==0]=0.0000001
-prox.model<-glmmTMB(prob.prox~ isPost*group + offset(log(numScans))+ (1|id), data = data, family = beta_family(link="logit"))
+prox.model<-glmmTMB(prob.prox~ isPost*group + sex + age + offset(log(numScans))+ (1|id), data = data, family = beta_family(link="logit"))
 summary(prox.model)
 
 
-#Plot change in number of unique proximity parnters
+#Plot change in number of unique proximity partners
 data %>%
+  mutate(isPost = fct_relevel(isPost, 
+                              "pre", "post")) %>%
   ggplot(aes(x=year.factor, y=numPartnersProx, fill=isPost))+
   geom_violin(scale ="width")+ geom_jitter(width = 0.1, alpha = 0.7)+
   geom_vline(xintercept = 3.5, linetype=2)+
@@ -212,27 +186,8 @@ data %>%
   facet_grid(~ group)
 ggsave("ProximityRates_PrePost.png")
 plot(density(data$numPartnersProx))
-
-#Check relationship between observation effort and number of proximity partners
-test=data[data$group.year=="KK2017",]
-test=data[data$year==2018,]
-test %>%
-  ggplot(aes(x=numScans, y=numPartnersProx, color=year.factor))+
-  geom_jitter()+
-  theme_light(base_size=15)
-
-data.prox = data
-data.prox$numScans<-scale(data.prox$numScans)
-prox.partner.model<-glmer(numPartnersProx~ isPost*group + offset(log(hrs.focalfollowed))+ (1|id), data = data, family = poisson(link = "log"))
+prox.partner.model<-lmer(numPartnersProx~ isPost*group + sex + age + offset(log(hrs.focalfollowed))+ (1|id), data = data)
 summary(prox.partner.model)
-
-plot(data$numPartnersProx, data$numScans)
-plot(data$numPartnersProx, data$hrs.focalfollowed)
-plot(data$numScans, data$hrs.focalfollowed)
-#Important note: offset(log(numScans)) causes an error... Initially I thought it could be
-#because number of proximity partners does not scale linearly with number of scans but does with number of hours...
-#This is not the case. For now I use number of hours
-#Also unsure if poisson is appropriate here?? Is this count/number of observations?
 
 # data %>%
 #   mutate(isPost = fct_relevel(isPost, 
@@ -248,39 +203,31 @@ plot(data$numScans, data$hrs.focalfollowed)
 # mean(data$prob.prox[data$isPost.year=="post2021"])
 
 
-###############################
-### Test change in grooming ###
-###############################
+##########################################################################
+### Test change in grooming duration and number of grooming partners ###
+##########################################################################
 
-#Test change in number of grooming events
+#Test change in time spent grooming
 data %>%
-  ggplot(aes(x=year.factor, y=groom.events.scans, fill=isPost))+
+  ggplot(aes(x=year.factor, y=groom.rate, fill=isPost))+
   geom_violin(scale ="width")+ geom_jitter(width = 0.1, alpha = 0.7)+
-  theme_light(base_size=15)+theme(axis.text.x = element_text(angle = 45))+
-  ylab('Number of groom events')+ xlab('Hurricane Status')+ facet_grid(~ group)
+  theme_classic(base_size=15)+
+  ylab('Groom rate')+ xlab('Hurricane Status')+ facet_grid(~ group)
+mean(data$groom.rate[data$isPost==0]); mean(data$groom.rate[data$isPost==1])
 
-#Check relationship between observation effort and number of proximity partners
-test=data[data$group.year=="KK2017",]
-test=data[data$year==2018,]
-data %>%
-  ggplot(aes(x=numScans, y=groom.events.scans, color=year.factor))+
-  geom_jitter()+
-  theme_light(base_size=15)
+groom.model<-glmer(groom.dur~ isPost*group + offset(log(hrs.focalfollowed))+ (1|id), data = data, family = poisson((link = "log")))
+summary(groom.model)
 
+#Test change in number of grooming partners
 data %>%
-  ggplot(aes(x=year.factor, y=prob.groom, fill=isPost))+
+  ggplot(aes(x=year.factor, y=numPartnersGroom, fill=isPost))+
   geom_violin(scale ="width")+ geom_jitter(width = 0.1, alpha = 0.7)+
-  theme_light(base_size=15)+theme(axis.text.x = element_text(angle = 45))+
-  ylab('p(grooming)')+ xlab('Hurricane Status')+ facet_grid(~ group)
-
-data$prob.groom[data$prob.groom==0]=0.0000001
-prob.groom.model<-glmmTMB(prob.groom~ isPost*group + offset(log(numScans))+ (1|id), data = data, family = beta_family(link="logit"))
-summary(prob.groom.model)
-
-groom.event.model<-glmer(groom.events.scans~ isPost*group + offset(log(hrs.focalfollowed))+ (1|id), data = data, family = poisson(link="log"))
-summary(prob.groom.model)
+  theme_light(base_size=15)+
+  geom_vline(xintercept = 3.5, linetype = "dashed", colour = "red")+
+  theme(axis.text.x = element_text(angle = 45))+
+  ylab('Groom rate')+ xlab('year')+ facet_grid(~ group)
+ggsave("GroomingRate_PrePost.png")
 
 
-
-numP.model<-glmer(num.partners~ isPost*group + sex + hrs.focalfollowed+ (1|id), data = data, family = poisson((link = "log")))
+numP.model<-glmer(numPartnersGroom~ isPost*group + offset(log(hrs.focalfollowed))+ (1|id), data = data, family = poisson((link = "log")))
 summary(numP.model)

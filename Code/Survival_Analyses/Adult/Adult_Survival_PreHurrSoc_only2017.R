@@ -14,7 +14,7 @@ library(coxme)
 #############################################
 
 ### Load data ###
-setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data')
+setwd('~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data')
 load('SocialCapital_Adults.RData'); data = SocialCapital.ALL[SocialCapital.ALL$year.prehurr==2017,]
 length(which(data$Survival==1))/nrow(data)
 Scale=365.25
@@ -22,13 +22,13 @@ Scale=365.25
 ### Format data ###
 
 #Binarise sociality
-data$std.partners.factor = NA
+data$std.partners.factor = "M"
 data$std.partners.factor[data$std.num.partners<0.7] = "L"
 data$std.partners.factor[data$std.num.partners>1.7] = "H"
 
 #format
 data<-within(data,{
-  std.partners.factor<-factor(std.partners.factor,labels=c("L","H"))
+  std.partners.factor<-factor(std.partners.factor,labels=c("L","M","H"))
   sex<-factor(sex,labels=c("M","F"))
   ordrank<-factor(ordrank, labels=c("L","M","H"))
   group<-factor(group,labels=c("F","V","KK"))  ##Informs the model of the levels within the categorical covariates (helps identify where the differences are)
@@ -46,15 +46,25 @@ data$sexF.toppartner <- as.numeric(data$sex) * data$top.partner
 
 
 ### Run models ###
-fitsocial.numpartner<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~num.partners*sex+ percentrank+ group.size,data=data) #Runs a cox PH model with age as the time scale.
+fitsocial.numpartner<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~num.partners + group + sex+ hrs.followed,data=data) #Runs a cox PH model with age as the time scale.
 cz <- cox.zph(fitsocial.numpartner) #Check model assumptions
 print(cz) ; #ggcoxzph(cz)
 summary(fitsocial.numpartner)
 
-fitsocial.toppartner<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~top.partner*sex+ percentrank,data=data) #Runs a cox PH model with age as the time scale.
+fitsocial.probgroom<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~prob.groom + group + sex,data=data) #Runs a cox PH model with age as the time scale.
+cz <- cox.zph(fitsocial.probgroom) #Check model assumptions
+print(cz) ; #ggcoxzph(cz)
+summary(fitsocial.probgroom)
+
+fitsocial.toppartner<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~top.partner + sex+ group,data=data) #Runs a cox PH model with age as the time scale.
 summary(fitsocial.toppartner)
 cz <- cox.zph(fitsocial.toppartner)
 print(cz)
+
+fitsocial.probprox<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~prob.prox + group + sex,data=data) #Runs a cox PH model with age as the time scale.
+cz <- cox.zph(fitsocial.probprox) #Check model assumptions
+print(cz) ; #ggcoxzph(cz)
+summary(fitsocial.probprox)
 
 ### Hazard ratio plots ###
 setwd('~/Documents/GitHub/Cayo-Maria-Survival/Results')

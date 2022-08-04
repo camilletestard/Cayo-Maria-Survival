@@ -22,8 +22,8 @@ setwd('~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data')
 load('SocialCapital_changeP_Adults.RData') #input dataframe generated previously.
 
 #Initialize variables
-fit.groom.hr=data.frame(matrix(ncol=3)); names(fit.groom.hr)=c("dpSocial","groupV","sexF")
-fit.prox.hr=data.frame(matrix(ncol=3)); names(fit.prox.hr)=c("dpAcc","groupV","sexF")
+fit.groom.hr=data.frame(matrix(ncol=4)); names(fit.groom.hr)=c("dpSocial.catMedium","dpSocial.catHigh","groupV","sexF")
+fit.prox.hr=data.frame(matrix(ncol=4)); names(fit.prox.hr)=c("dpAcc.catMedium","dpAcc.catHigh","groupV","sexF")
 
 
 i=1; max_iter = max(full.data$iter)
@@ -56,12 +56,12 @@ for (i in 1:max_iter){
                            labels=c('Small', 'Medium', 'High'))
 
   #Fit the survival models
-  try(fitsocial.groom<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~dpSocial +group +sex +(1|id),data=data)) #Runs a cox PH model with age as the time scale.
+  try(fitsocial.groom<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~dpSocial.cat +group +sex +(1|id),data=data)) #Runs a cox PH model with age as the time scale.
   summary(fitsocial.groom)
   # cz <- cox.zph(fitsocial.groom)
   # print(cz)
   
-  try(fitsocial.prox<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~dpAcc +group +sex +(1|id),data=data)) #Runs a cox PH model with age as the time scale.
+  try(fitsocial.prox<-coxme(Surv(Age_entry.days, Age_event.days, Survival)~dpAcc.cat +group +sex +(1|id),data=data)) #Runs a cox PH model with age as the time scale.
   summary(fitsocial.prox)
   # cz <- cox.zph(fitsocial.prox)
   # print(cz)
@@ -77,8 +77,8 @@ for (i in 1:max_iter){
   
 }
 
-save(fit.groom.hr, fit.prox.hr,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SurvivalAdults_PrePost.RData")
-load("~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SurvivalAdults_PrePost.RData")
+save(fit.groom.hr, fit.prox.hr,file ="~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data/SurvivalAdults_PrePost_categ.RData")
+load("~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data/SurvivalAdults_PrePost_categ.RData")
 
 ### PLOT SURVIVAL ###
 
@@ -89,7 +89,7 @@ fit.groom.hr = fit.groom.hr[unique(-idx.na.groom),]
 idx.na.prox = which(is.na(fit.prox.hr),arr.ind=T)
 fit.prox.hr = fit.prox.hr[unique(-idx.na.prox),]
 
-#Remove extreme outliers due to model misfit of model
+#Remove extreme outliers due to model misfit
 idx.outlier.groom = which(abs(fit.groom.hr) > 2, arr.ind = T)
 fit.groom.hr=fit.groom.hr[-idx.outlier.groom[,1],]
 fit.groom.hr.exp=exp(fit.groom.hr)
@@ -100,10 +100,10 @@ fit.prox.hr=fit.prox.hr[-idx.outlier.prox[,1],]
 fit.prox.hr.exp = exp(fit.prox.hr)
 fit.prox.hr.plot =  melt(fit.prox.hr.exp)
 
-hist(fit.prox.hr.exp$dpAcc, 50, xlab = "Hazard ratio for change in proximity", main = "Histogram of Hazard Ratios for change in proximity")
-hist(fit.groom.hr.exp$dpSocial, 65, xlab = "Hazard ratio for change in grooming", main = "Histogram of Hazard Ratios for change in grooming")
-median(fit.prox.hr.exp$dpAcc, na.rm=T); quantile(exp(fit.prox.hr$dpAcc),probs = c(0.025, 0.975), na.rm = T)
-median(fit.groom.hr.exp$dpSocial, na.rm=T); quantile(exp(fit.groom.hr$dpSocial),probs = c(0.025, 0.975), na.rm = T)
+hist(fit.prox.hr.exp$dpAcc.catHigh, 50, xlab = "Hazard ratio for change in proximity", main = "Histogram of Hazard Ratios for change in proximity")
+hist(fit.groom.hr.exp$dpSocial.catHigh, 65, xlab = "Hazard ratio for change in grooming", main = "Histogram of Hazard Ratios for change in grooming")
+median(fit.prox.hr.exp$dpAcc.catHigh, na.rm=T); quantile(exp(fit.prox.hr$dpAcc.catHigh),probs = c(0.025, 0.975), na.rm = T)
+median(fit.groom.hr.exp$dpSocial.catHigh, na.rm=T); quantile(exp(fit.groom.hr$dpSocial.catHigh),probs = c(0.025, 0.975), na.rm = T)
 
 ggplot(fit.prox.hr.plot, aes(x=variable, y=value, color=variable))+
   geom_violin()+

@@ -14,10 +14,12 @@ library(coxme)
 #############################################
 
 ### Load data ###
-setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data')
+setwd('~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data')
 load('SocialCapital_Adults.RData'); data = SocialCapital.ALL
 length(which(data$Survival==1))/nrow(data)
 Scale=365.25
+length(unique(data$id))
+sum(data$Survival[match(unique(data$id),data$id)])
 
 ### Format data ###
 

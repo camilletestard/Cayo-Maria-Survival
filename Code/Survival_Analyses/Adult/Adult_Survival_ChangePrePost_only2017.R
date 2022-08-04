@@ -20,7 +20,7 @@ full.data=full.data[full.data$year.prehurr==2017,] #only consider 2017 as year p
 fit.groom.hr=data.frame(matrix(ncol=5)); names(fit.groom.hr)=c("coef","exp(coef)","se(coef)","z","Pr(>|z|)")
 fit.prox.hr=data.frame(matrix(ncol=5)); names(fit.prox.hr)=c("coef","exp(coef)","se(coef)","z","Pr(>|z|)")
 
-i=18
+i=1
 for (i in 1:max(full.data$iter)){
   data2= full.data[full.data$iter==i,];
   
@@ -56,12 +56,12 @@ for (i in 1:max(full.data$iter)){
   length(which(data2$Survival==1))/nrow(data2)
   
   #Fit the survival models
-  fitsocial.groom<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~dpSocial*sex+percentrank +num_obs,data=data2) #Runs a cox PH model with age as the time scale.
+  fitsocial.groom<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~dpSocial+ sex+group,data=data2) #Runs a cox PH model with age as the time scale.
   summary(fitsocial.groom)
   cz <- cox.zph(fitsocial.groom)
   #print(cz)
   
-  fitsocial.prox<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~dpAcc+sex+ordrank +num_obs,data=data2) #Runs a cox PH model with age as the time scale.
+  fitsocial.prox<-coxph(Surv(Age_entry.days, Age_event.days, Survival)~dpAcc+sex+group,data=data2) #Runs a cox PH model with age as the time scale.
   summary(fitsocial.prox)
   cz <- cox.zph(fitsocial.prox)
   #print(cz)

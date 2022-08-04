@@ -31,7 +31,7 @@ groupyears = c("F2015","V2015","R2015","KK2015",
                "R2016","V2016","F2016","HH2016",
                "F2017","KK2017","V2017","V2018","KK2018",
                "S2019","V2019","F2021","V2021") 
-gy=4
+gy=16
 SocialCapital.ALL = data.frame()
 savePath = '~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data/'
 
@@ -144,6 +144,13 @@ for (gy in 1:length(groupyears)){ #for all group & years
       social.data[id,"adj.num.prox.partners"] = social.data[id,"num.prox.partners"]/social.data[id, "numscans"] #NOT SURE HWO TO ADJUST FOR NUMBER OF PROXIMITY PARTNERS HERE
       social.data[id,"num.prox.events"] = length(which(!is.na(prox.scans$in.proximity)))
       
+      # #Find the number of partners in proximity at each scan
+      # for (i in 1:length(prox.scans)){ #for all scans of id
+      #   numProxPartners = length(which(prox_partners[scans[i],2:length(prox_partners)] != "")) #find the number of partners at that scan
+      #   proxRate[id, "numPartners"] = proxRate[id, "numPartners"] + numProxPartners #add #partners through scans
+      #   if (numProxPartners>0){proxRate[id, "is.in.prox"]=proxRate[id, "is.in.prox"]+1}
+      # }
+      
       groom.scans = groom_data[which(groom_data$focalID == unqIDs[id]),]
       id.groom = unique(str_trim(unlist(str_split(unique(groom.scans$partner.ID),c(",")))))
       if(length(which(id.groom =="N/A")!=0)){id.groom =id.groom[-which(id.groom =="N/A")]}
@@ -164,6 +171,7 @@ for (gy in 1:length(groupyears)){ #for all group & years
     SocialCapitalData$numPartnersProx = social.data$num.prox.partners
     SocialCapitalData$prox.events = social.data$num.prox.events
     SocialCapitalData$prob.prox = social.data$num.prox.events/social.data$numscans
+    SocialCapitalData$prox.rate = social.data$proxRate
     SocialCapitalData$numPartnersGroom= social.data$num.groom.partners
     SocialCapitalData$groom.events.scans= social.data$num.groom.events
     SocialCapitalData$prob.groom =  SocialCapitalData$groom.events.scans/SocialCapitalData$numScans
@@ -242,12 +250,21 @@ for (gy in 1:length(groupyears)){ #for all group & years
     adjMat = dils::AdjacencyFromEdgelist(select(groom_data_compiled, giver, receiver, constrained_duration))
     groomMat = adjMat[["adjacency"]]; rownames(groomMat) = adjMat[["nodelist"]]; colnames(groomMat) = adjMat[["nodelist"]]
     
-    #Find number of unique partners
+    #Extract groom metrics
     unqIDs = as.character(SocialCapitalData$id)
     id=1; social_integration= data.frame(); partner_strength=matrix(NA, nrow = length(unqIDs), ncol=20); partner_DSI=matrix(NA, nrow = length(unqIDs), ncol=20)
     for (id in 1:length(unqIDs)){
       social_integration[id,"id"] = unqIDs[id];
+      
+      #Find the number of groom events
+      if(groupyears[gy]!="F2021" & groupyears[gy]!="V2021"){
       social_integration[id,"groom.events.scans"] = sum(prox_data$focal.activity[prox_data$focal.monkey == unqIDs[id]] == "social")
+      }else{
+        social_integration[id,"groom.events.scans"] = sum(prox_data$focal.activity[prox_data$focal.monkey == unqIDs[id]] == "Groom Get"|
+                                                            prox_data$focal.activity[prox_data$focal.monkey == unqIDs[id]] == "Groom Give")
+      }
+      
+      #Get strength to top partner and number of grooming partners
       partners = unique(c(groom_data_compiled$receiver[groom_data_compiled$giver == unqIDs[id]],
                           groom_data_compiled$giver[groom_data_compiled$receiver == unqIDs[id]]))
       social_integration[id,"groom.rec"] = sum(groom_data_compiled$constrained_duration[groom_data_compiled$receiver == unqIDs[id]])
@@ -313,6 +330,7 @@ for (gy in 1:length(groupyears)){ #for all group & years
         proxRate[id, "numPartners"] = proxRate[id, "numPartners"] + numProxPartners #add #partners through scans
         if (numProxPartners>0){proxRate[id, "is.in.prox"]=proxRate[id, "is.in.prox"]+1}
       }
+      
     }
     
     proxRate$proxRate = proxRate$numPartners/proxRate$numScans #rate is the average number of partner per proximity scan
@@ -322,6 +340,7 @@ for (gy in 1:length(groupyears)){ #for all group & years
     SocialCapitalData$numPartnersProx = proxRate$num.prox.partners
     SocialCapitalData$prox.events = proxRate$is.in.prox
     SocialCapitalData$prob.prox = proxRate$probProx
+    #SocialCapitalData$prox.rate = proxRate$proxRate
     SocialCapitalData$prob.groom =  SocialCapitalData$groom.events.scans/SocialCapitalData$numScans
     
     #####################################################################

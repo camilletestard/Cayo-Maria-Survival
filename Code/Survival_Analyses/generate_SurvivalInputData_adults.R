@@ -43,8 +43,8 @@ for (gy in 1:length(groupyears)){
   prox_data = read.csv(paste("Group",groupyears[gy],"_ProximityGroups.txt", sep = ""))
 
   #Create Social Capital Data frame & add Sex, Age, Rank, Group and Year
-  SocialCapitalData= meta_data[meta_data$focalcutoff_met=="Y",c("id","sex","ordinal.rank","percofsex.dominanted","hrs.focalfollowed")]
-  names(SocialCapitalData)=c("id","sex","ordrank","percentrank","hrs.followed")
+  SocialCapitalData= meta_data[,c("id","sex","ordinal.rank","percofsex.dominanted","hrs.focalfollowed","focalcutoff_met")]
+  names(SocialCapitalData)=c("id","sex","ordrank","percentrank","hrs.followed","focalcutoff_met")
   SocialCapitalData$group = group[gy]
   SocialCapitalData$year.prehurr = years[gy]
   if (group[gy] =="KK"){SocialCapitalData$study.end.date = study.end.date.KK}else{SocialCapitalData$study.end.date = study.end.date}
@@ -83,9 +83,6 @@ for (gy in 1:length(groupyears)){
 
   #Number of days in study. Total study period or until death/cull
   SocialCapitalData$days.in.study = SocialCapitalData$Age_event.days-SocialCapitalData$Age_entry.days
-
-  #Discard individuals who died before the start of the study
-  SocialCapitalData = SocialCapitalData[SocialCapitalData$days.in.study>0,]
 
   #Create survival column which will be used in all models
   SocialCapitalData$Survival = 0
@@ -137,10 +134,58 @@ for (gy in 1:length(groupyears)){
   #####################################################################
   ## Extract social integration measure from proximity data
   #Number of proximity partners
-  #Probability of proximity? Proximity rate?
+  #Probability of proximity 
+  #Probability of grooming?
   #####################################################################
   
+  prox_partners = as.data.frame(str_split(prox_data$in.proximity, c(","), simplify = TRUE))
+  colnames(prox_partners)[1]="focalID"
+  
+  #Find the number of scans per focal ID
+  proxRate = data.frame()
+  for (id in 1:length(unqIDs)){
+    proxRate[id, "id"]= unqIDs[id]
+    scans = which(prox_partners$focalID == unqIDs[id]) #find the number of scans where focal ID = id
+    proxRate[id, "numScans"] = length(scans) #num scans
+    proxRate[id, "numPartners"] = 0; proxRate[id, "is.in.prox"] = 0;
+    
+    #Number of unique proximity partners
+    prox.scans = prox_data[scans,]
+    id.in.prox = str_split(prox.scans$in.proximity, c(","))
+    unique.partners.prox = unique(unlist(c(id.in.prox)))
+    unique.partners.prox =as.character(gsub("'",'',unique.partners.prox))
+    if(length(which(unique.partners.prox =="N/A")!=0)){unique.partners.prox =unique.partners.prox[-which(unique.partners.prox =="N/A")]}
+    if(length(which(is.na(unique.partners.prox))!=0)){unique.partners.prox =unique.partners.prox[-which(is.na(unique.partners.prox))]}
+    proxRate[id,"num.prox.partners"] = length(unique.partners.prox)
+    
+    #Find the number of partners in proximity at each scan
+    for (i in 1:length(scans)){ #for all scans of id
+      numProxPartners = length(which(prox_partners[scans[i],2:length(prox_partners)] != "")) #find the number of partners at that scan
+      proxRate[id, "numPartners"] = proxRate[id, "numPartners"] + numProxPartners #add #partners through scans
+      if (numProxPartners>0){proxRate[id, "is.in.prox"]=proxRate[id, "is.in.prox"]+1}
+    }
+    
+    #Find the number of groom events
+    proxRate[id,"groom.events"] = sum(prox_data$focal.activity[prox_data$focal.monkey == unqIDs[id]] == "social")
+    
+  }
+  
+  proxRate$proxRate = proxRate$numPartners/proxRate$numScans #rate is the average number of partner per proximity scan
+  proxRate$probProx = proxRate$is.in.prox/proxRate$numScans
+  
+  SocialCapitalData$numScans = proxRate$numScans
+  SocialCapitalData$numPartnersProx = proxRate$num.prox.partners
+  SocialCapitalData$prox.events = proxRate$is.in.prox
+  SocialCapitalData$prob.prox = proxRate$probProx
+  SocialCapitalData$prox.rate = proxRate$proxRate
+  SocialCapitalData$groom.events = proxRate$groom.events
+  SocialCapitalData$prob.groom =  SocialCapitalData$groom.events/SocialCapitalData$numScans
+  
+  
   ###################################################################
+  #Discard individuals who died before the start of the study
+  SocialCapitalData = SocialCapitalData[SocialCapitalData$days.in.study>0,]
+  
   # Merge and save data
   SocialCapital.ALL = rbind(SocialCapital.ALL, SocialCapitalData)
 }
@@ -152,24 +197,28 @@ SocialCapital.ALL$YearOfEvent[!is.na(SocialCapital.ALL$DOT)] = as.numeric(format
 SocialCapital.ALL$YearOfEvent[is.na(SocialCapital.ALL$YearOfEvent)] = 2021
 
 #PLACE HOLDER TO GET RANK AT TIME OF EVENT.
+#Note: for now we exclude rank because of sample size limits
+
+#Only keep individuals that meet the cut off
+SocialCapital.ALL=SocialCapital.ALL[SocialCapital.ALL$hrs.followed>=1,]
 
 #Get number of unique IDs included
 allids = unique(SocialCapital.ALL$id); table(SocialCapital.ALL$group[match(allids, SocialCapital.ALL$id)])
 length(which(SocialCapital.ALL$Survival[match(allids, SocialCapital.ALL$id)]==1)); length(SocialCapital.ALL$Survival[match(allids, SocialCapital.ALL$id)]==1)
 
 #Save file for pre-hurricane sociality
-save(SocialCapital.ALL,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SocialCapital_Adults.RData")
+save(SocialCapital.ALL,file ="~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data/SocialCapital_Adults.RData")
 
 #Add change in p(grooming) and p(proximity) to the dataframe
 #Because this only includes a subset of the individuals, save it in a separate file
-setwd('~/Documents/GitHub/Cayo-Maria-Survival/R.Data/')
+setwd('~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data/')
 load('ChangeP.RData')
 names(dprob.ALL)[6] = "year.prehurr"
 full.data = merge(dprob.ALL, SocialCapital.ALL, by=c("id","year.prehurr","group"))
 min_obs = 20
 full.data<- full.data[as.numeric(full.data$num_obs)>=min_obs,];
 
-save(full.data,file ="~/Documents/GitHub/Cayo-Maria-Survival/R.Data/SocialCapital_changeP_Adults.RData")
+save(full.data,file ="~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data/SocialCapital_changeP_Adults.RData")
 
 #Get the numebr of unique IDs for change in pre vs. post hurricane sociality
 example_data <- full.data[full.data$iter ==1,]

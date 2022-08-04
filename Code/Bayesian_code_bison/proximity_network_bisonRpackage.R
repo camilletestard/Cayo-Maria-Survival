@@ -9,10 +9,11 @@ source("scripts/functions_GlobalNetworkMetrics.R")
 library(bisonR)
 library(dplyr)
 library(ggplot2)
+library(stringr)
 
 #For groups and years:
-group= "V"
-year=2016
+group= "S"
+year=2019
 groupyear = paste(group,year,sep="")
 
 ######################################################
@@ -77,9 +78,14 @@ save(df_obs_agg,file = "Proximity_df.RData")
 ## Fit edge model
 ######################################################
 library(bisonR)
+library(dplyr)
 
-setwd('~/Documents/GitHub/Cayo-Maria-Survival/Data/Data All Cleaned/BehavioralDataFiles/')
-load("Proximity_df.RData")
+# setwd('~/Documents/GitHub/Cayo-Maria-Survival/Data/Data All Cleaned/BehavioralDataFiles/')
+# load("Proximity_df.RData")
+
+sim_data <- simulate_edge_model("binary", aggregated = FALSE)
+df <- sim_data$df_sim
+head(df)
 
 #Set priors
 priors <- get_default_priors("binary")
@@ -87,11 +93,18 @@ priors
 
 #Fit model
 fit_edge <- edge_model(
-  (count | total_samples) ~ dyad(ID1, ID2), 
-  data=df_obs_agg, 
+  (event | duration) ~ dyad(node_1_id, node_2_id), 
+  data=df, 
   data_type="binary", 
   priors=priors
 )
+# #Fit model
+# fit_edge <- edge_model(
+#   (count | total_samples) ~ dyad(ID1, ID2), 
+#   data=df_obs_agg, 
+#   data_type="binary", 
+#   priors=priors
+# )
 
 #Check model fit
 plot_trace(fit_edge)
@@ -101,7 +114,15 @@ plot_predictions(fit_edge, num_draws=100)
 
 summary(fit_edge)
 
+#Plot network
+plot_network(fit_edge, lwd=5)
 
+#############################3
+##Dyadic regression
+
+priors <- get_default_priors("dyadic_regression")
+priors$error <- "half-normal(2.5)"
+priors
 
 
 
