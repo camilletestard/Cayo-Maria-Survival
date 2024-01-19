@@ -1,0 +1,59 @@
+#Model proximity networks for Cayo data with bison and run downstream regression
+#C. Testard October 2022
+
+#Load libraries
+#For plotting
+library(ggplot2)
+library(igraph)
+
+#Load data
+data_path = "~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data/"
+load(paste0(data_path,"aggression_data.RData"))
+
+edgelist.all$groupyear = paste0(edgelist.all$group, edgelist.all$year)
+
+#Set group year list
+group = c("F","V","KK","V","F","F","KK","V","V","KK","S","V","F","V")
+years = c(2015,2015,2015,
+          2016,2016,2017,2017,2017,
+          2018, 2018,2019, 2019,2021,2021)
+groupyears = c("F2015","V2015","KK2015",
+               "V2016","F2016","F2017",
+               "KK2017","V2017","V2018","KK2018",
+               "S2019","V2019","F2021","V2021")
+gy=1
+for (gy in 1:length(groupyears)){ #for all group years
+  
+#Load network edgelist
+el = edgelist.all[edgelist.all$groupyear==groupyears[gy],]
+el$year=factor(el$year)
+el$weight = el$count/el$total_obs_time
+weightedEL<-el[,c("ID1","ID2","weight")]
+
+#Create adjacency matrix from edgelist
+adjMat = dils::AdjacencyFromEdgelist(weightedEL)# create adjacency matrix based on edge list.
+data = adjMat[["adjacency"]]; rownames(data) = adjMat[["nodelist"]]; colnames(data) = adjMat[["nodelist"]]
+#read adjacency matrix into igraph
+m=as.matrix(data) # coerces the data set as a matrix
+am.g=graph.adjacency(m,mode= "directed",weighted=T)
+
+l <- layout.fruchterman.reingold(am.g, repulserad=vcount(am.g)^5,
+                                 area=vcount(am.g)^3)
+#changes size of labels of vertices
+V(am.g)$label.cex <- 0.2
+
+V(am.g)$degree=igraph::degree(am.g)
+
+setwd("~/Documents/GitHub/Cayo-Maria-Survival/Results/SocialNetworks/Aggression")
+
+tiff(paste0("AggressionNetwork ",groupyears[gy],".tiff"), 
+     units="in", width=10, height=8, res=300, compression = 'lzw')
+plot.igraph(am.g, layout=layout.sphere,
+            #vertex.label=V(am.g)$name, vertex.label.font=2,
+            vertex.size=10,
+            edge.color="grey20", 
+            edge.width=E(am.g)$weight*2,edge.arrow.size = 0.05,edge.curved=0.5,
+            main = groupyears[gy])
+dev.off()
+
+}
