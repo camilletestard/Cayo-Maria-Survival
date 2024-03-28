@@ -60,7 +60,7 @@ imputed.density=list()
     node.id<-node_ids[[groupyears[gy]]]
     data$prox.strength<-as.numeric(strength[match(data$id, node.id)])
     data$prox.degree<-as.numeric(degree[match(data$id, node.id)])
-    data.final<-data[,c("id","sex","age","group","year","isPost","isPost.year", "id.year","prox.strength", "prox.degree")]
+    data.final<-data[,c("id","sex","age","ordinal.rank","group","year","isPost","isPost.year", "id.year","prox.strength", "prox.degree")]
     
     data.all<-rbind(data.all, data.final)
     

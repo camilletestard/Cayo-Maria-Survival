@@ -43,7 +43,7 @@ Death_Per_Year = colSums(t3)
 sum(Death_Per_Year[1:5]) #pre-hurricane
 sum(Death_Per_Year[6:10])#post-hurricane
 
-#Ven diagram of IDs pre 
+#Venn diagram of IDs pre 
 setwd('~/Documents/GitHub/Cayo-Maria-Survival/Results/')
 set1 = names(which(t2[,2]==1))
 set2 = names(which(t2[,1]==1))

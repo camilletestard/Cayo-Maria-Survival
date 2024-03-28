@@ -260,7 +260,7 @@ data %>%
 #Visualize change in grooming rate
 data %>%
   ggplot(aes(x=year.factor, y=groom.rate, fill=isPost))+
-  geom_violin(scale ="width")+ geom_jitter(width = 0.1, alpha = 0.7)+
+  geom_violin(scale ="width")+ #geom_jitter(width = 0.1, alpha = 0.7)+
   geom_vline(xintercept = 5.5, linetype=2)+
   theme_light(base_size=15)+theme(axis.text.x = element_text(angle = 45))+
   #facet_grid(~Location)+

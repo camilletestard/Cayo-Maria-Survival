@@ -141,37 +141,26 @@ CI = c(est-se*qnorm(0.975), est+se*qnorm(0.975))
 HR = exp(est); print(HR)
 HR_CI = exp(CI); print(HR_CI)
 
-# #Standard proximity strength, interaction location
-# strength.prox.post.location <- with(imp, coxme(Surv(Age_entry.days, Age_event.days, Survival)~ 
-#                                         1+ std.node_strength*location+ sex + percofsex.dominanted+
-#                                         (1|id) +(1|period)))
-# mdl.pool.strength<-summary(mice::pool(strength.prox.post.location))
-# est = mdl.pool.strength$estimate[1] ; print(est)
-# se = mdl.pool.strength$std.error[1]
-# CI = c(est-se*qnorm(0.975), est+se*qnorm(0.975))
-# HR = exp(est); print(HR)
-# HR_CI = exp(CI); print(HR_CI)
-
-#Run model of observed value (most likely, which is the mean of the bayesian distribution)
-i=1; data_strength=vector(); data_degree=vector()
-for (i in 1:length(imputed.data)){
-  data_strength = cbind(data_strength, imputed.data[[i]]$std.node_strength)
-  data_degree = cbind(data_degree, imputed.data[[i]]$std.degree)
-}
-
-data = imputed.data[[1]]
-data$std.node_strength = rowMeans(data_strength);
-data$std.node_degree = rowMeans(data_degree);
-
-strength.observed <- coxme(Surv(Age_entry.days, Age_event.days, Survival)~ 
-                                        1+ std.node_strength+ sex + #percofsex.dominanted+
-                                        (1|group) + (1|id) +(1|period), data=data)
-summary(strength.observed)
-
-degree.observed <- coxme(Surv(Age_entry.days, Age_event.days, Survival)~ 
-                             1+ std.node_degree+ sex + #percofsex.dominanted+
-                             (1|group) + (1|id) +(1|period), data=data)
-summary(degree.observed)
+# #Run model of observed value (most likely, which is the mean of the bayesian distribution)
+# i=1; data_strength=vector(); data_degree=vector()
+# for (i in 1:length(imputed.data)){
+#   data_strength = cbind(data_strength, imputed.data[[i]]$std.node_strength)
+#   data_degree = cbind(data_degree, imputed.data[[i]]$std.degree)
+# }
+# 
+# data = imputed.data[[1]]
+# data$std.node_strength = rowMeans(data_strength);
+# data$std.node_degree = rowMeans(data_degree);
+# 
+# strength.observed <- coxme(Surv(Age_entry.days, Age_event.days, Survival)~ 
+#                                         1+ std.node_strength+ sex + #percofsex.dominanted+
+#                                         (1|group) + (1|id) +(1|period), data=data)
+# summary(strength.observed)
+# 
+# degree.observed <- coxme(Surv(Age_entry.days, Age_event.days, Survival)~ 
+#                              1+ std.node_degree+ sex + #percofsex.dominanted+
+#                              (1|group) + (1|id) +(1|period), data=data)
+# summary(degree.observed)
 
 save(sex.post, status.post, strength.prox.post, degree.prox.post, file = "ProxMdlOutput_PostHurr_allgroups.RData")
 # setwd("~/Documents/GitHub/Cayo-Maria-Survival/Data/R.Data/")
